@@ -287,8 +287,6 @@ class Deli:
         self.wait_for_text_to_appear_and_click("退出登录")
         self.log.logger.info("点击确定按钮...")
         self.wait_for_text_to_appear_and_click("确定")
-        self.log.logger.info("任务完成，准备退出...")
-        sys.exit()
 
     def init_userinfo(self):
 
@@ -298,10 +296,11 @@ class Deli:
     def add_userinfo(self):
         if not os.path.exists("userInfo.json"):
             self.init_userinfo()
-        username = input("请输入用户手机号（按回车键结束）：")
 
+        user = []
+        username = input("请输入用户手机号（按回车键结束）：")
         password = input("请输入用户密码（按回车键结束）：")
-        return (username, password)
+        user.append([username, password])
 
     def save_userinfo(self, user):
         with open("userInfo.json", "w") as f:
@@ -346,8 +345,10 @@ def main():
                 f.close()
         deli.init_fake_location()
         # deli.login(info[用户名称])
-
-        deli.login(user)
+        for item in user:
+            deli.login(item)
+        log.logger.info("任务完成，准备退出...")
+        sys.exit()
 
     except Exception as e:
         log.logger.error(e, exc_info=True)
