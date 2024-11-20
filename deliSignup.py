@@ -33,6 +33,7 @@ click_pos = {
     "签到成功": (238, 428, 287, 90),
     "返回": (54, 109, 2, 2),
     "手机打卡": (47, 565, 175, 81),
+    "登录失效确定": (183, 763, 2, 2),
 }
 
 Log_level = "i"
@@ -133,7 +134,7 @@ class Deli:
         self.fake_location_package_name = "com.lerist.fakelocation"
         self.serial = "127.0.0.1:5555"
         self.log = Log("deli_main", Log_level)
-        self.install_path = self.get_leidian_install_path()
+        self.install_path = self.get_leidian_install_path() + "\\"
         self.focr = Ocr()
 
         subprocess.Popen(self.install_path + "dnconsole.exe launch --index 0")
@@ -231,6 +232,9 @@ class Deli:
         password = info[1]
         user = (username, password)
         self.start_app(self.deli_package_name)
+        sleep(0.5)
+        self.click_text("登录失效确定")
+        self.click_text("登录失效确定")
         while True:
             img_file = self.device.screenshot(format="opencv")
             result = self.focr.get_string_in_pic(img_file, click_pos["登录"])
@@ -247,7 +251,9 @@ class Deli:
             elif "不在打卡位置" in result:
                 self.click_text("刷新")
                 self.log.logger.info("点击刷新...")
-
+            elif "确定" in result:
+                self.click_text("登录失效确定")
+                self.log.logger.info("登录已失效，重新登陆...")
             elif result == "登录":
                 self.log.logger.info("准备登录...")
                 self.log.logger.info("输入用户手机号...")
@@ -282,12 +288,11 @@ class Deli:
         self.log.logger.info("点击确定按钮...")
         self.wait_for_text_to_appear_and_click("确定")
         self.log.logger.info("任务完成，准备退出...")
+        sys.exit()
 
     def init_userinfo(self):
-        user = ()
 
         with open("userInfo.json", "w") as f:
-            f.write(json.dumps(user))
             f.close()
 
     def add_userinfo(self):
@@ -321,21 +326,32 @@ class Deli:
 
 @admin_start
 def main():
+    log = Log("main")
+    try:
+        deli = Deli()
+        if not os.path.exists("./screenshot"):
+            deli.log.logger.info("未检测到screenshot文件夹，准备新建...")
+            os.makedirs("screenshot")
+        if not os.path.exists("userInfo.json"):
+            deli.log.logger.info("未发现用户配置文件，准备添加用户数据...")
+            user = deli.add_userinfo()
+        else:
+            with open("userInfo.json", "r") as f:
+                try:
+                    user = json.load(f)
+                except json.decoder.JSONDecodeError as e:
+                    if "Expecting value" in str(e):
+                        user = deli.add_userinfo()
 
-    deli = Deli()
-    if not os.path.exists("./screenshot"):
-        deli.log.logger.info("未检测到screenshot文件夹，准备新建...")
-        os.makedirs("screenshot")
-    if not os.path.exists("userInfo.json"):
-        deli.log.logger.info("未发现用户配置文件，准备添加用户数据...")
-        user = deli.add_userinfo()
-    else:
-        with open("userInfo.json", "r") as f:
-            user = json.load(f)
-            f.close()
-    deli.init_fake_location()
-    # deli.login(info[用户名称])
-    deli.login(user)
+                f.close()
+        deli.init_fake_location()
+        # deli.login(info[用户名称])
+
+        deli.login(user)
+
+    except Exception as e:
+        log.logger.error(e, exc_info=True)
+        raise e
 
 
 if __name__ == "__main__":
