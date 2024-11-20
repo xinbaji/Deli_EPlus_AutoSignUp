@@ -6,12 +6,10 @@ import logging
 import subprocess
 
 from time import sleep, strftime, localtime
-from threading import Thread
 
 import cv2
 import numpy as np
 import uiautomator2 as u2
-import matplotlib.pyplot as plt
 from paddleocr import PaddleOCR
 
 # 756/1344->1080/1920 1.408/1.408
@@ -45,6 +43,7 @@ class Log:
         log_level = logging.DEBUG if mode == "d" else logging.INFO
         log_file_name = strftime("%Y-%m-%d", localtime())
         if not os.path.exists("./log/" + log_file_name + ".txt"):
+
             os.makedirs("log", exist_ok=True)
             with open("./log/" + log_file_name + ".txt", "w") as f:
                 f.write("*********deli_AutoSignup log_file************\n")
@@ -97,10 +96,6 @@ class Ocr:
         h = int(1.408 * h)
         w = int(1.408 * w)
         img = img[y1 : y1 + h, x1 : x1 + w]
-        if Log_level == "d" and click_pos["我的"] == identify_area:
-            plt.imshow(img), plt.axis("off")
-            plt.show()
-            sleep(300)
         result_string = self.ocr.ocr(img)
         if isinstance(result_string[0], list):
             result_string = result_string[0][0][1][0]
@@ -133,20 +128,14 @@ class Deli:
         global Log_level
         self.program_path = os.getcwd().replace("\\", "/") + "/"
         self.screenshot_png_path = self.program_path + "screenshot/screen.png"
-        self.install_path = "D:\\Softwares\\leidian\\LDPlayer9\\"
+
         self.deli_package_name = "com.delicloud.app.smartoffice"
         self.fake_location_package_name = "com.lerist.fakelocation"
         self.serial = "127.0.0.1:5555"
-        if not os.path.exists("./screenshot"):
-            os.makedirs("screenshot")
-        if not os.path.exists("userInfo.json"):
-            self.add_userinfo()
-        else:
-            with open("userInfo.json", "r") as f:
-                self.user = json.load(f)
-                f.close()
-        self.focr = Ocr()
         self.log = Log("deli_main", Log_level)
+        self.install_path = self.get_leidian_install_path()
+        self.focr = Ocr()
+
         subprocess.Popen(self.install_path + "dnconsole.exe launch --index 0")
         self.log.logger.info("等待模拟器完全启动中...")
         self.device = u2.connect(self.serial)
@@ -229,6 +218,7 @@ class Deli:
                 self.log.logger.info("Fake Location启动完成...")
                 break
             elif result == "启动模拟":
+                self.log.logger.info("点击启动模拟...")
                 self.click_text("启动模拟")
                 self.waiting_for_text_to_appear("停止模拟")
                 self.log.logger.info("Fake Location启动完成...")
@@ -239,6 +229,7 @@ class Deli:
     def login(self, info: list):
         username = info[0]
         password = info[1]
+        user = (username, password)
         self.start_app(self.deli_package_name)
         while True:
             img_file = self.device.screenshot(format="opencv")
@@ -250,79 +241,101 @@ class Deli:
                 self.log.logger.info("已在打卡范围内")
                 self.click_text("打卡")
                 self.waiting_for_text_to_appear(["打卡成功", "签退成功", "签到成功"])
+                self.log.logger.info("打卡成功...")
                 self.click_text("返回")
                 break
             elif "不在打卡位置" in result:
                 self.click_text("刷新")
+                self.log.logger.info("点击刷新...")
 
             elif result == "登录":
+                self.log.logger.info("准备登录...")
+                self.log.logger.info("输入用户手机号...")
                 self.click_text("用户名")
                 self.clear_input()
                 sleep(1)
                 self.send_keys(username)
                 sleep(1)
+                self.log.logger.info("输入密码...")
                 self.click_text("密码")
                 self.clear_input()
                 sleep(1)
                 self.send_keys(password)
                 sleep(1)
+                self.log.logger.info("点击登录...")
                 self.click_text("登录")
                 self.wait_for_text_to_appear_and_click("同意并继续")
                 self.waiting_for_text_to_appear("手机打卡")
+                self.save_userinfo(user)
+                self.log.logger.info("登录成功，准备打卡...")
         self.waiting_for_text_to_appear("手机打卡")
+        self.log.logger.info("准备退出账号...")
         self.click_text("我的")
+        self.log.logger.info("点击我的...")
         self.wait_for_text_to_appear_and_click("设置")
+        self.log.logger.info("点击设置...")
         sleep(1)
         self.swipe(388, 782, 384, 183)
         sleep(1)
+        self.log.logger.info("点击退出登录...")
         self.wait_for_text_to_appear_and_click("退出登录")
+        self.log.logger.info("点击确定按钮...")
         self.wait_for_text_to_appear_and_click("确定")
+        self.log.logger.info("任务完成，准备退出...")
 
     def init_userinfo(self):
-        user = {}
-        if not os.path.exists("userInfo.json"):
-            with open("userInfo.json", "w") as f:
-                f.write(json.dumps(user))
-                f.close()
+        user = ()
+
+        with open("userInfo.json", "w") as f:
+            f.write(json.dumps(user))
+            f.close()
 
     def add_userinfo(self):
         if not os.path.exists("userInfo.json"):
             self.init_userinfo()
-        with open("userInfo.json", "r") as f:
-            user: dict = json.loads(f.read())
-            f.close()
-        while True:
-            infoname = input("请输入用户名称（按回车键结束#键取消输入）：")
-            if "#" in infoname:
-                break
-            username = input("请输入用户手机号（按回车键结束#键取消输入）：")
-            if "#" in username:
-                break
-            password = input("请输入用户密码（按回车键结束#键取消输入）：")
-            if "#" in password:
-                break
-            temp = {infoname: (username, password)}
-            user.update(temp)
+        username = input("请输入用户手机号（按回车键结束）：")
 
+        password = input("请输入用户密码（按回车键结束）：")
+        return (username, password)
+
+    def save_userinfo(self, user):
         with open("userInfo.json", "w") as f:
             f.write(json.dumps(user))
             f.close()
         self.log.logger.info("用户数据保存成功")
 
-    def get_userinfo(self, infoname) -> list:
-        return self.user[infoname]
+    def get_leidian_install_path(self):
+        # D:\Softwares\leidian\LDPlayer9
+        if not os.path.exists("config.json"):
+            leidian_install_path = input("请输入雷电模拟器安装路径：")
+            with open("config.json", "w") as f:
+                f.write(json.dumps(leidian_install_path))
+                f.close()
+            return leidian_install_path
+        else:
+            with open("config.json", "r") as f:
+                leidian_install_path = json.load(f)
+                f.close()
+            return leidian_install_path
 
 
 @admin_start
 def main():
 
     deli = Deli()
-
+    if not os.path.exists("./screenshot"):
+        deli.log.logger.info("未检测到screenshot文件夹，准备新建...")
+        os.makedirs("screenshot")
+    if not os.path.exists("userInfo.json"):
+        deli.log.logger.info("未发现用户配置文件，准备添加用户数据...")
+        user = deli.add_userinfo()
+    else:
+        with open("userInfo.json", "r") as f:
+            user = json.load(f)
+            f.close()
     deli.init_fake_location()
     # deli.login(info[用户名称])
-    # deli.login(info["陈"])
-    # deli.login(info["李"])
-    # deli.login(info["王"])
+    deli.login(user)
 
 
 if __name__ == "__main__":

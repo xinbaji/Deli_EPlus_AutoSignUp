@@ -1,3 +1,7 @@
 userInfo.json
 screenshot/
 log/
+config.json
+build/
+dist/
+deliSignup.spec
