@@ -6,3 +6,5 @@ build/
 dist/
 deliSignup.spec
 import/
+Pipfile
+Pipfile.lock

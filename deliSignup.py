@@ -3,40 +3,13 @@ import sys
 import json
 import ctypes
 import logging
-import subprocess
+from subprocess import Popen
 
 from time import sleep, strftime, localtime
-
-import cv2
-import numpy as np
-import uiautomator2 as u2
+from numpy import ndarray
 from paddleocr import PaddleOCR
-
-# 756/1344->1080/1920 1.408/1.408
-click_pos = {
-    "启动模拟": (71, 780, 147, 56),
-    "停止模拟": (71, 780, 147, 56),
-    "用户名": (522, 544, 2, 2),
-    "密码": (541, 668, 2, 2),
-    "登录": (298, 855, 232, 137),
-    "同意并继续": (438, 798, 183, 64),
-    "刷新": (571, 572, 90, 60),
-    "不在打卡位置": (288, 926, 230, 55),
-    "已在打卡范围": (288, 926, 230, 55),
-    "打卡": (336, 734, 90, 60),
-    "我的": (596, 1310, 90, 38),
-    "设置": (136, 932, 107, 75),
-    "退出登录": (296, 1279, 196, 73),
-    "确定": (488, 794, 113, 58),
-    "打卡成功": (238, 428, 287, 90),
-    "签退成功": (238, 428, 287, 90),
-    "签到成功": (238, 428, 287, 90),
-    "返回": (54, 109, 2, 2),
-    "手机打卡": (47, 565, 175, 81),
-    "登录失效确定": (183, 763, 2, 2),
-}
-
-Log_level = "i"
+import uiautomator2 as u2
+from uiautomator2.exceptions import ConnectError
 
 
 class Log:
@@ -65,9 +38,8 @@ class Log:
 
 class Ocr:
     def __init__(self) -> None:
-        global Log_level
         self.ocr = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
-        self.log = Log("ocr", Log_level)
+        self.log = Log("ocr")
 
     def get_string_in_pic(
         self,
@@ -86,9 +58,7 @@ class Ocr:
         Returns:
             string -- 识别的文字
         """
-        if isinstance(img_file, str):
-            img = cv2.imread(img_file)
-        elif isinstance(img_file, np.ndarray):
+        if isinstance(img_file, ndarray):
             img = img_file
 
         x1, y1, w, h = identify_area
@@ -126,25 +96,50 @@ def admin_start(func):
 
 class Deli:
     def __init__(self) -> None:
-        global Log_level
         self.program_path = os.getcwd().replace("\\", "/") + "/"
-        self.screenshot_png_path = self.program_path + "screenshot/screen.png"
-
+        # 756/1344->1080/1920 1.408/1.408
+        self.click_pos = {
+            "启动模拟": (71, 780, 147, 56),
+            "停止模拟": (71, 780, 147, 56),
+            "用户名": (522, 544, 2, 2),
+            "密码": (541, 668, 2, 2),
+            "登录": (298, 855, 232, 137),
+            "同意并继续": (438, 798, 183, 64),
+            "刷新": (571, 572, 90, 60),
+            "不在打卡位置": (288, 926, 230, 55),
+            "已在打卡范围": (288, 926, 230, 55),
+            "打卡": (336, 734, 90, 60),
+            "我的": (596, 1310, 90, 38),
+            "设置": (136, 932, 107, 75),
+            "退出登录": (296, 1279, 196, 73),
+            "确定": (488, 794, 113, 58),
+            "打卡成功": (238, 428, 287, 90),
+            "签退成功": (238, 428, 287, 90),
+            "签到成功": (238, 428, 287, 90),
+            "返回": (54, 109, 2, 2),
+            "手机打卡": (47, 565, 175, 81),
+            "登录失效确定": (183, 763, 2, 2),
+        }
         self.deli_package_name = "com.delicloud.app.smartoffice"
         self.fake_location_package_name = "com.lerist.fakelocation"
         self.serial = "127.0.0.1:5555"
-        self.log = Log("deli_main", Log_level)
+        self.log = Log("deli_main")
         self.install_path = self.get_leidian_install_path() + "\\"
         self.focr = Ocr()
 
-        subprocess.Popen(self.install_path + "dnconsole.exe launch --index 0")
+        Popen(self.install_path + "dnconsole.exe launch --index 0")
         self.log.logger.info("等待模拟器完全启动中...")
-        self.device = u2.connect(self.serial)
-        subprocess.Popen(self.install_path + "adb connect " + self.serial)
-        self.log.logger.info("ADB已连接模拟器...")
+        while True:
+            try:
+                self.device = u2.connect(self.serial)
+            except ConnectError:
+                continue
+            else:
+                break
+        self.log.logger.info("模拟器完全启动,adb连接成功...")
 
     def click_text(self, target_string: str):
-        x1, y1, w, h = click_pos[target_string]
+        x1, y1, w, h = self.click_pos[target_string]
         click_point = (int((x1 + w / 2) * 1.408), int((y1 + h / 2) * 1.408))
         self.device.click(click_point[0], click_point[1])
 
@@ -156,7 +151,7 @@ class Deli:
             target.append(target_string)
         while True:
             img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, click_pos[target[0]])
+            result = self.focr.get_string_in_pic(img_file, self.click_pos[target[0]])
             if result == None:
                 continue
             for i in target:
@@ -166,7 +161,9 @@ class Deli:
     def wait_for_text_to_appear_and_click(self, target_string: str):
         while True:
             img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, click_pos[target_string])
+            result = self.focr.get_string_in_pic(
+                img_file, self.click_pos[target_string]
+            )
             if result == None:
                 continue
             elif target_string in result:
@@ -176,7 +173,7 @@ class Deli:
                 continue
 
     def start_app(self, package_name: str):
-        subprocess.Popen(
+        Popen(
             self.install_path
             + "dnconsole.exe "
             + "runapp --index 0 --packagename "
@@ -185,12 +182,12 @@ class Deli:
 
     def send_keys(self, text: str):
         command = "action --index 0 --key call.input --value " + text
-        subprocess.Popen(self.install_path + "dnconsole.exe " + command)
+        Popen(self.install_path + "dnconsole.exe " + command)
 
     def clear_input(self):
         command = 'adb --index 0 --command "' + "shell input keyevent 67" + '"'
         for i in range(0, 14, 1):
-            subprocess.Popen(self.install_path + "dnconsole.exe " + command)
+            Popen(self.install_path + "dnconsole.exe " + command)
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int):
         command = (
@@ -205,13 +202,13 @@ class Deli:
             + str(y2)
             + '"'
         )
-        subprocess.Popen(self.install_path + "dnconsole.exe " + command)
+        Popen(self.install_path + "dnconsole.exe " + command)
 
     def init_fake_location(self):
         self.start_app(self.fake_location_package_name)
         while True:
             img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, click_pos["停止模拟"])
+            result = self.focr.get_string_in_pic(img_file, self.click_pos["停止模拟"])
             if result == None:
                 continue
             self.log.logger.debug(result)
@@ -230,14 +227,13 @@ class Deli:
     def login(self, info: list):
         username = info[0]
         password = info[1]
-        user = (username, password)
         self.start_app(self.deli_package_name)
         sleep(0.5)
         self.click_text("登录失效确定")
         self.click_text("登录失效确定")
         while True:
             img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, click_pos["登录"])
+            result = self.focr.get_string_in_pic(img_file, self.click_pos["登录"])
             if result == None:
                 continue
             self.log.logger.debug(result)
@@ -259,20 +255,20 @@ class Deli:
                 self.log.logger.info("输入用户手机号...")
                 self.click_text("用户名")
                 self.clear_input()
-                sleep(1)
+                sleep(1.5)
                 self.send_keys(username)
-                sleep(1)
+                sleep(1.5)
                 self.log.logger.info("输入密码...")
                 self.click_text("密码")
                 self.clear_input()
-                sleep(1)
+                sleep(1.5)
                 self.send_keys(password)
-                sleep(1)
+                sleep(1.5)
                 self.log.logger.info("点击登录...")
                 self.click_text("登录")
                 self.wait_for_text_to_appear_and_click("同意并继续")
                 self.waiting_for_text_to_appear("手机打卡")
-                self.save_userinfo(user)
+
                 self.log.logger.info("登录成功，准备打卡...")
         self.waiting_for_text_to_appear("手机打卡")
         self.log.logger.info("准备退出账号...")
@@ -288,25 +284,26 @@ class Deli:
         self.log.logger.info("点击确定按钮...")
         self.wait_for_text_to_appear_and_click("确定")
 
-    def init_userinfo(self):
-
-        with open("userInfo.json", "w") as f:
-            f.close()
-
     def add_userinfo(self):
-        if not os.path.exists("userInfo.json"):
-            self.init_userinfo()
-
         user = []
-        username = input("请输入用户手机号（按回车键结束）：")
-        password = input("请输入用户密码（按回车键结束）：")
-        user.append([username, password])
+        while True:
+            username = input("请输入用户手机号（按回车键结束#键退出）：")
+            if "#" in username:
+                break
+            password = input("请输入用户密码（按回车键结束#键退出）：")
+            if "#" in password:
+                break
+            user.append([username, password])
+        return user
 
     def save_userinfo(self, user):
-        with open("userInfo.json", "w") as f:
-            f.write(json.dumps(user))
-            f.close()
-        self.log.logger.info("用户数据保存成功")
+        if os.path.exists("userInfo.json"):
+            return True
+        else:
+            with open("userInfo.json", "w") as f:
+                f.write(json.dumps(user))
+                f.close()
+            self.log.logger.info("用户数据保存成功")
 
     def get_leidian_install_path(self):
         # D:\Softwares\leidian\LDPlayer9
@@ -328,9 +325,6 @@ def main():
     log = Log("main")
     try:
         deli = Deli()
-        if not os.path.exists("./screenshot"):
-            deli.log.logger.info("未检测到screenshot文件夹，准备新建...")
-            os.makedirs("screenshot")
         if not os.path.exists("userInfo.json"):
             deli.log.logger.info("未发现用户配置文件，准备添加用户数据...")
             user = deli.add_userinfo()
@@ -347,6 +341,7 @@ def main():
         # deli.login(info[用户名称])
         for item in user:
             deli.login(item)
+        deli.save_userinfo(user)
         log.logger.info("任务完成，准备退出...")
         sys.exit()
 
