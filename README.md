@@ -1,4 +1,5 @@
 # Deli_EPlus_AutoSignup 
+Fake location已无法使用，此程序失效，停止更新
 ## 一、使用方法
 ### 1. 下载雷电模拟器
 * 修改雷电模拟器设置：
