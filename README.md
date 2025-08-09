@@ -15,6 +15,12 @@
 *  登录后点击：我的 -> 设置 -> 关闭首页悬浮挂件
   
 ### 5.运行deliSignup.py
+* 先运行一次deliSignup.py 目录中会生成一个config.toml 在此文件中更改配置
+* 修改serial：即模拟器所在的adb端口 格式如下：
+        
+        [Emulator]
+        serial = "127.0.0.1:16384" #地址与端口号写在双引号内
+        path = "C:\\Program Files\\NetEase\\MuMu\\nx_main\\MuMuNxMain.exe -v 0" #为模拟器启动路径 但是这个自动启动模拟器的功能没有写
 * 输入需要登录的手机号和密码 信息保存在config.toml中 可以通过修改此文件 添加多个手机号远程签到
   * 格式：
   

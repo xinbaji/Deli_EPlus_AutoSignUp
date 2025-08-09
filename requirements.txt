@@ -1,0 +1,11 @@
+fitz
+numpy
+onnxruntime==1.20.1
+opencv_python
+opencv_python_headless
+pdf2image
+Pillow
+pyclipper
+Shapely
+tomlkit
+uiautomator2
