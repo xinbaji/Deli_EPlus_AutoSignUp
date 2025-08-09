@@ -1,118 +1,33 @@
-import os
-import sys
-import json
-import ctypes
-import logging
-from subprocess import Popen
-
-from time import sleep, strftime, localtime
-from numpy import ndarray
-from paddleocr import PaddleOCR
-import uiautomator2 as u2
-from uiautomator2.exceptions import ConnectError
-
-
-class Log:
-    def __init__(self, log_name, mode: str = "i") -> None:
-        log_level = logging.DEBUG if mode == "d" else logging.INFO
-        log_file_name = strftime("%Y-%m-%d", localtime())
-        if not os.path.exists("./log/" + log_file_name + ".txt"):
-
-            os.makedirs("log", exist_ok=True)
-            with open("./log/" + log_file_name + ".txt", "w") as f:
-                f.write("*********deli_AutoSignup log_file************\n")
-                f.close()
-        handler = logging.FileHandler("./log/" + log_file_name + ".txt")
-        handler.setLevel(level=logging.DEBUG)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(funcName)s - %(levelname)s - %(message)s"
-        )
-        handler.setFormatter(formatter)
-        console = logging.StreamHandler()
-        console.setLevel(log_level)
-
-        self.logger = logging.getLogger(log_name)
-        self.logger.setLevel(level=log_level)
-        self.logger.addHandler(handler)
-
-
-class Ocr:
-    def __init__(self) -> None:
-        self.ocr = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
-        self.log = Log("ocr")
-
-    def get_string_in_pic(
-        self,
-        img_file,
-        identify_area: tuple,
-    ) -> str:
-        """判断指定文字是否在指定区域内
-
-        Arguments:
-            target_string {str} -- 目标字符串
-            identify_area {list} -- 4 int x1,y1,w,h
-
-        Keyword Arguments:
-            picpath {str} -- 被识别图像位置 (default: {"./screenshot/screen.png"})
-
-        Returns:
-            string -- 识别的文字
-        """
-        if isinstance(img_file, ndarray):
-            img = img_file
-
-        x1, y1, w, h = identify_area
-        x1 = int(1.408 * x1)
-        y1 = int(1.408 * y1)
-        h = int(1.408 * h)
-        w = int(1.408 * w)
-        img = img[y1 : y1 + h, x1 : x1 + w]
-        result_string = self.ocr.ocr(img)
-        if isinstance(result_string[0], list):
-            result_string = result_string[0][0][1][0]
-            return result_string
-        else:
-            return None
-
-
-def admin_start(func):
-    def wrapper(*awrgs, **kwargs):
-        try:
-            result = ctypes.windll.shell32.IsUserAnAdmin()
-        except:
-            result = False
-        finally:
-            if result:
-                em = func(*awrgs, **kwargs)
-                sleep(30)
-                return em
-            else:
-                ctypes.windll.shell32.ShellExecuteW(
-                    None, "runas", sys.executable, __file__, None, 1
-                )
-
-    return wrapper
-
+from Controller import Controller
+from Config import Config
+from Log import Log
 
 class Deli:
     def __init__(self) -> None:
-        self.program_path = os.getcwd().replace("\\", "/") + "/"
-        # 756/1344->1080/1920 1.408/1.408
+        self.config = Config()
+        self.controller = Controller()
+        self.log = Log("deli").logger
+
+        self.program_path = self.config.get_value('Program', 'path', default=None)
+        self.fake_location_package_name = self.config.get_value('Fake_location', 'package_name')
+        self.deli_package_name = self.config.get_value('Deli', 'package_name')
+
         self.click_pos = {
-            "启动模拟": (71, 780, 147, 56),
-            "停止模拟": (71, 780, 147, 56),
-            "用户名": (522, 544, 2, 2),
-            "密码": (541, 668, 2, 2),
-            "登录": (298, 855, 232, 137),
-            "同意并继续": (438, 798, 183, 64),
-            "刷新": (571, 572, 90, 60),
-            "不在打卡位置": (288, 926, 230, 55),
-            "已在打卡范围": (288, 926, 230, 55),
-            "打卡": (336, 734, 90, 60),
-            "我的": (596, 1310, 90, 38),
-            "设置": (136, 932, 107, 75),
-            "退出登录": (296, 1279, 196, 73),
-            "确定": (488, 794, 113, 58),
+            "启动模拟": (100, 1100, 300, 1190),
+            "停止模拟": (100, 1100, 300, 1190),
+            "用户名": (580, 745, 600, 780),
+            "密码": (580, 910, 600, 955),
+            "登录": (480, 1290, 595, 1350),
+            "同意并继续": (630, 1130, 860, 1190),
+            "智能考勤": (330, 600, 530, 655),
+            "刷新": (830, 975, 920, 1020),
+            "不在打卡位置": (425, 1475, 720, 1530),
+            "已在打卡范围": (425, 1475, 720, 1530),
+            "打卡": (490, 1190, 590, 1255),
+            "我的": (860, 1850, 940, 1895),
+            "设置": (200, 1325, 300, 1380),
+            "退出登录": (425, 1815, 655, 1875),
+            "确定": (710, 1125, 815, 1180),
             "打卡成功": (238, 428, 287, 90),
             "签退成功": (238, 428, 287, 90),
             "签到成功": (238, 428, 287, 90),
@@ -120,235 +35,180 @@ class Deli:
             "手机打卡": (47, 565, 175, 81),
             "登录失效确定": (183, 763, 2, 2),
         }
-        self.deli_package_name = "com.delicloud.app.smartoffice"
-        self.fake_location_package_name = "com.lerist.fakelocation"
-        self.serial = "127.0.0.1:5555"
-        self.log = Log("deli_main")
-        self.install_path = self.get_leidian_install_path() + "\\"
-        self.focr = Ocr()
 
-        Popen(self.install_path + "dnconsole.exe launch --index 0")
-        self.log.logger.info("等待模拟器完全启动中...")
-        while True:
-            try:
-                self.device = u2.connect(self.serial)
-            except ConnectError:
-                continue
-            else:
-                break
-        self.log.logger.info("模拟器完全启动,adb连接成功...")
+        self.init_fake_location()
 
-    def click_text(self, target_string: str):
-        x1, y1, w, h = self.click_pos[target_string]
-        click_point = (int((x1 + w / 2) * 1.408), int((y1 + h / 2) * 1.408))
-        self.device.click(click_point[0], click_point[1])
+        for user in self.config.get_userlist():
+            self.login(user["username"], user["password"])
 
-    def waiting_for_text_to_appear(self, target_string):
-        if isinstance(target_string, list):
-            target = target_string
-        elif isinstance(target_string, str):
-            target = []
-            target.append(target_string)
-        while True:
-            img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, self.click_pos[target[0]])
-            if result == None:
-                continue
-            for i in target:
-                if i in result:
-                    return True
+        self.log.info("签到完成")
 
-    def wait_for_text_to_appear_and_click(self, target_string: str):
-        while True:
-            img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(
-                img_file, self.click_pos[target_string]
-            )
-            if result == None:
-                continue
-            elif target_string in result:
-                self.click_text(target_string)
-                break
-            else:
-                continue
 
-    def start_app(self, package_name: str):
-        Popen(
-            self.install_path
-            + "dnconsole.exe "
-            + "runapp --index 0 --packagename "
-            + package_name
-        )
 
-    def send_keys(self, text: str):
-        command = "action --index 0 --key call.input --value " + text
-        Popen(self.install_path + "dnconsole.exe " + command)
-
-    def clear_input(self):
-        command = 'adb --index 0 --command "' + "shell input keyevent 67" + '"'
-        for i in range(0, 14, 1):
-            Popen(self.install_path + "dnconsole.exe " + command)
-
-    def swipe(self, x1: int, y1: int, x2: int, y2: int):
-        command = (
-            'adb --index 0 --command "'
-            + "shell input swipe "
-            + str(x1)
-            + " "
-            + str(y1)
-            + " "
-            + str(x2)
-            + " "
-            + str(y2)
-            + '"'
-        )
-        Popen(self.install_path + "dnconsole.exe " + command)
 
     def init_fake_location(self):
-        self.start_app(self.fake_location_package_name)
-        while True:
-            img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, self.click_pos["停止模拟"])
-            if result == None:
-                continue
-            self.log.logger.debug(result)
-            if result == "停止模拟":
-                self.log.logger.info("Fake Location启动完成...")
-                break
-            elif result == "启动模拟":
-                self.log.logger.info("点击启动模拟...")
-                self.click_text("启动模拟")
-                self.waiting_for_text_to_appear("停止模拟")
-                self.log.logger.info("Fake Location启动完成...")
-                break
-            else:
-                continue
+        self.controller.start_app(self.fake_location_package_name)
 
-    def login(self, info: list):
-        username = info[0]
-        password = info[1]
-        self.start_app(self.deli_package_name)
-        sleep(0.5)
-        self.click_text("登录失效确定")
-        self.click_text("登录失效确定")
-        while True:
-            img_file = self.device.screenshot(format="opencv")
-            result = self.focr.get_string_in_pic(img_file, self.click_pos["登录"])
-            if result == None:
-                continue
-            self.log.logger.debug(result)
-            if "已在打卡范围" in result:
-                self.log.logger.info("已在打卡范围内")
-                self.click_text("打卡")
-                self.waiting_for_text_to_appear(["打卡成功", "签退成功", "签到成功"])
-                self.log.logger.info("打卡成功...")
-                self.click_text("返回")
-                break
-            elif "不在打卡位置" in result:
-                self.click_text("刷新")
-                self.log.logger.info("点击刷新...")
-            elif "确定" in result:
-                self.click_text("登录失效确定")
-                self.log.logger.info("登录已失效，重新登陆...")
-            elif result == "登录":
-                self.log.logger.info("准备登录...")
-                self.log.logger.info("输入用户手机号...")
-                self.click_text("用户名")
-                self.clear_input()
-                sleep(1.5)
-                self.send_keys(username)
-                sleep(1.5)
-                self.log.logger.info("输入密码...")
-                self.click_text("密码")
-                self.clear_input()
-                sleep(1.5)
-                self.send_keys(password)
-                sleep(1.5)
-                self.log.logger.info("点击登录...")
-                self.click_text("登录")
-                self.wait_for_text_to_appear_and_click("同意并继续")
-                self.waiting_for_text_to_appear("手机打卡")
+        def handle_start_emulate():
+            self.log.info("点击启动模拟...")
+            self.controller.click(*self.click_pos["启动模拟"])
 
-                self.log.logger.info("登录成功，准备打卡...")
-        self.waiting_for_text_to_appear("手机打卡")
-        self.log.logger.info("准备退出账号...")
-        self.click_text("我的")
-        self.log.logger.info("点击我的...")
-        self.wait_for_text_to_appear_and_click("设置")
-        self.log.logger.info("点击设置...")
-        sleep(1)
-        self.swipe(388, 782, 384, 183)
-        sleep(1)
-        self.log.logger.info("点击退出登录...")
-        self.wait_for_text_to_appear_and_click("退出登录")
-        self.log.logger.info("点击确定按钮...")
-        self.wait_for_text_to_appear_and_click("确定")
+        def handle_stop_emulate():
+            self.log.info("Fake Location启动完成...")
 
-    def add_userinfo(self):
-        user = []
-        while True:
-            username = input("请输入用户手机号（按回车键结束#键退出）：")
-            if "#" in username:
-                break
-            password = input("请输入用户密码（按回车键结束#键退出）：")
-            if "#" in password:
-                break
-            user.append([username, password])
-        return user
-
-    def save_userinfo(self, user):
-        if os.path.exists("userInfo.json"):
-            return True
-        else:
-            with open("userInfo.json", "w") as f:
-                f.write(json.dumps(user))
-                f.close()
-            self.log.logger.info("用户数据保存成功")
-
-    def get_leidian_install_path(self):
-        # D:\Softwares\leidian\LDPlayer9
-        if not os.path.exists("config.json"):
-            leidian_install_path = input("请输入雷电模拟器安装路径：")
-            with open("config.json", "w") as f:
-                f.write(json.dumps(leidian_install_path))
-                f.close()
-            return leidian_install_path
-        else:
-            with open("config.json", "r") as f:
-                leidian_install_path = json.load(f)
-                f.close()
-            return leidian_install_path
-
-
-@admin_start
-def main():
-    log = Log("main")
-    try:
-        deli = Deli()
-        if not os.path.exists("userInfo.json"):
-            deli.log.logger.info("未发现用户配置文件，准备添加用户数据...")
-            user = deli.add_userinfo()
-        else:
-            with open("userInfo.json", "r") as f:
+        self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate},
+                             self.click_pos["启动模拟"])
+        self.controller.wait({ "停止模拟": handle_stop_emulate},
+                             self.click_pos["启动模拟"])
+    def login(self, username, password):
+        """
+        登录德力E+并执行签到操作
+        
+        Args:
+            username: 用户名/手机号
+            password: 密码
+        """
+        self.log.info(f"开始执行签到操作: username={username}, password={'*****' if password else None}")
+        if not username or not password:
+            error_msg = "用户名或密码不能为空"
+            self.log.error(error_msg)
+            raise ValueError(error_msg)
+            
+        self.log.info(f"开始为用户 {username} 执行登录和签到操作")
+        
+        try:
+            def handle_in_sign_area():
+                self.log.info("已在打卡范围内")
                 try:
-                    user = json.load(f)
-                except json.decoder.JSONDecodeError as e:
-                    if "Expecting value" in str(e):
-                        user = deli.add_userinfo()
+                    self.controller.wait("打卡", self.click_pos["打卡"]).click()
+                    self.log.info("点击打卡按钮")
+                    
+                    def handle_sign_success():
+                        self.log.info("打卡成功...")
+                        try:
+                            self.controller.click(*self.click_pos["返回"])
+                            self.log.info("点击返回按钮")
+                        except Exception as e:
+                            self.log.error(f"点击返回按钮失败: {str(e)}")
+                            raise
+    
+                    self.controller.wait(
+                        {"打卡成功": handle_sign_success, "签退成功": handle_sign_success, "签到成功": handle_sign_success},
+                        self.click_pos["打卡成功"])
+                except Exception as e:
+                    self.log.error(f"处理打卡范围内状态失败: {str(e)}")
+                    raise
+    
+            def handle_not_in_sign_area():
+                self.log.info("不在打卡位置，尝试刷新")
+                try:
+                    self.controller.click(*self.click_pos['刷新'])
+                    self.log.info("点击刷新按钮")
+                except Exception as e:
+                    self.log.error(f"点击刷新按钮失败: {str(e)}")
+                    raise
+    
+            def handle_sign_invaild_confirm():
+                self.log.info("检测到登录失效确认对话框")
+                try:
+                    self.controller.click(*self.click_pos["登录失效确定"])
+                    self.log.info("点击登录失效确定按钮")
+                except Exception as e:
+                    self.log.error(f"点击登录失效确定按钮失败: {str(e)}")
+                    raise
+            def handle_login_success():
+                    # 等待智能考勤
+                self.log.info("等待智能考勤页面...")
+                self.controller.wait("智能考勤", self.click_pos["智能考勤"])
+                self.log.info("登录成功，进入智能考勤页面")
 
-                f.close()
-        deli.init_fake_location()
-        # deli.login(info[用户名称])
-        for item in user:
-            deli.login(item)
-        deli.save_userinfo(user)
-        log.logger.info("任务完成，准备退出...")
-        sys.exit()
+            def handle_login():
+                self.log.info("检测到登录页面，准备登录")
+                try:
+                    # 输入用户名
+                    self.log.info("准备输入用户手机号...")
+                    self.controller.click(*self.click_pos["用户名"])
+                    self.log.info("点击用户名输入框")
+                    self.controller.clear_input()
+                    self.log.info("清除用户名输入框")
+                    
+                    self.controller.send_keys(username)
+                    self.log.info("输入用户名完成")
+    
+                    # 输入密码
+                    self.log.info("准备输入密码...")
+                    self.controller.click(*self.click_pos["密码"])
+                    self.log.info("点击密码输入框")
+                    self.controller.clear_input()
+                    self.log.info("清除密码输入框")
+                    
+                    self.controller.send_keys(password)
+                    self.log.info("输入密码完成")
+    
+                    # 点击登录
+                    self.log.info("准备点击登录按钮...")
+                    self.controller.click(*self.click_pos["登录"])
+                    self.log.info("点击登录按钮完成")
+                    
+                    # 等待并点击同意并继续
+                    self.log.info("等待同意并继续按钮...")
+                    self.controller.wait("同意并继续", self.click_pos["同意并继续"]).click()
+                    self.log.info("点击同意并继续按钮完成")
+                    handle_login_success()
+                except Exception as e:
+                    self.log.error(f"登录过程中发生错误: {str(e)}")
+                    raise
 
-    except Exception as e:
-        log.logger.error(e, exc_info=True)
-        raise e
+            def handle_skip():
+                self.controller.get_text_location("跳过").click()
+                self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login}).click()
+
+
+    
+            # 启动应用
+            self.log.info(f"启动应用: {self.deli_package_name}")
+            self.controller.start_app(self.deli_package_name)
+            self.log.info("应用启动成功")
+
+            # 等待并点击智能考勤
+
+            self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip}).click()
+
+            
+            # 等待多种可能的状态
+            '''self.log.info("等待打卡状态...")
+            self.controller.wait({
+                "已在打卡范围": handle_in_sign_area, 
+                "不在打卡位置": handle_not_in_sign_area,
+                "确定": handle_sign_invaild_confirm, 
+                "登录": handle_login
+            })'''
+            self.log.info("打卡操作完成")
+    
+            # 退出账号
+            self.log.info("准备退出账号...")
+            self.controller.wait("我的", self.click_pos["我的"]).click()
+            self.log.info("点击我的按钮")
+            
+            self.controller.wait("设置", self.click_pos["设置"]).click()
+            self.log.info("点击设置按钮")
+            self.controller.wait(2)
+            self.controller.swipe(600, 1600, 900, 500)
+            self.log.info("向上滑动屏幕")
+            self.controller.wait(1)
+            self.controller.wait("退出登录", self.click_pos["退出登录"]).click()
+            self.log.info("点击退出登录按钮")
+            
+            self.controller.wait("确定", self.click_pos["确定"]).click()
+            self.log.info("点击确定按钮，退出登录完成")
+            
+            return True
+        except Exception as e:
+            self.log.error(f"登录或签到过程中发生错误: {str(e)}", exc_info=True)
+            raise
+
+
 
 
 if __name__ == "__main__":
-    main()
+    Deli()
