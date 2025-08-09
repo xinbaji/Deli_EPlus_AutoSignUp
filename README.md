@@ -35,3 +35,5 @@
       username=XXX
       password=XXX
 * enjoy！
+
+OCR文字识别支持：OnnxOCR : https://github.com/jingsongliujing/OnnxOCR/tree/main
