@@ -28,12 +28,11 @@ class Deli:
             "设置": (200, 1325, 300, 1380),
             "退出登录": (425, 1815, 655, 1875),
             "确定": (710, 1125, 815, 1180),
-            "打卡成功": (238, 428, 287, 90),
-            "签退成功": (238, 428, 287, 90),
-            "签到成功": (238, 428, 287, 90),
-            "返回": (54, 109, 2, 2),
-            "手机打卡": (47, 565, 175, 81),
-            "登录失效确定": (183, 763, 2, 2),
+            "打卡成功": (352, 612, 718, 718),
+            "签退成功": (352, 612, 718, 718),
+            "签到成功": (352, 612, 718, 718),
+            "返回": (71, 146, 121, 196),
+            "登录失效确定": (474, 1048, 600, 1120),
         }
 
         self.init_fake_location()
@@ -116,6 +115,9 @@ class Deli:
                 except Exception as e:
                     self.log.error(f"点击登录失效确定按钮失败: {str(e)}")
                     raise
+
+                handle_login()
+                handle_login_success()
             def handle_login_success():
                     # 等待智能考勤
                 self.log.info("等待智能考勤页面...")
@@ -172,17 +174,17 @@ class Deli:
 
             # 等待并点击智能考勤
 
-            self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip}).click()
+            self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip,"确定":handle_sign_invaild_confirm}).click()
 
             
             # 等待多种可能的状态
-            '''self.log.info("等待打卡状态...")
+            self.log.info("等待打卡状态...")
             self.controller.wait({
                 "已在打卡范围": handle_in_sign_area, 
                 "不在打卡位置": handle_not_in_sign_area,
                 "确定": handle_sign_invaild_confirm, 
                 "登录": handle_login
-            })'''
+            })
             self.log.info("打卡操作完成")
     
             # 退出账号

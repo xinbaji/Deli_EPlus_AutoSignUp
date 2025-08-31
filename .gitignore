@@ -10,3 +10,5 @@ Pipfile
 Pipfile.lock
 1.png
 test.png
+/config.toml
+/.venv/
