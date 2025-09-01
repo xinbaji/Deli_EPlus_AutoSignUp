@@ -13,6 +13,7 @@ class Deli:
         self.deli_package_name = "com.delicloud.app.smartoffice"
 
         self.click_pos = {
+            "不再显示":(566,1755,752,1822),
             "暂不更新":(560,1744,746,1819),
             "启动模拟": (100, 1100, 300, 1190),
             "停止模拟": (100, 1100, 300, 1190),
@@ -49,6 +50,9 @@ class Deli:
     def init_fake_location(self):
         self.controller.start_app(self.fake_location_package_name)
 
+        def handle_ad_on(self):
+            self.log.info("出现广告，点击不再显示")
+            self.controller.click(*self.click_pos["不再显示"])
         def handle_start_emulate():
             self.log.info("点击启动模拟...")
             self.controller.click(*self.click_pos["启动模拟"])
@@ -60,6 +64,9 @@ class Deli:
             self.log.info("暂不更新")
             self.controller.click(*self.click_pos["暂不更新"])
 
+        self.controller.wait(
+            {"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate, "暂不更新": handle_auto_update,"不再显示":handle_ad_on})
+        self.controller.wait(0.5)
         self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate,"暂不更新":handle_auto_update})
         self.controller.wait(0.5)
         self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate},
@@ -182,7 +189,7 @@ class Deli:
 
             # 等待并点击智能考勤
 
-            self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip,"确定":handle_sign_invaild_confirm}).click()
+            self.controller.wait({"确定":handle_sign_invaild_confirm,"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip}).click()
 
             
             # 等待多种可能的状态
