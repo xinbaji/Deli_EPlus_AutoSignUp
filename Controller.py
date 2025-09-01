@@ -1,7 +1,6 @@
-import subprocess
+from subprocess import run
 from typing import Optional, Tuple, Dict, Callable, Union, overload  # 导入类型提示相关模块
 import time  # 导入时间模块用于等待操作
-from subprocess import Popen  # 导入子进程模块用于启动模拟器
 import uiautomator2 as u2  # 导入Android设备控制库
 from uiautomator2 import Device, ConnectError
 from uiautomator2.exceptions import LaunchUiAutomationError
@@ -35,7 +34,7 @@ class Controller:
         self.ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False).ocr  # 初始化OCR识别器
         self.log= Log("Controller","d").logger # 初始化日志记录器
 
-
+        self.text_location = ()
 
         self.device: Device = self.launch_emulator()  # 连接设备
 
@@ -78,7 +77,7 @@ class Controller:
         """
         从图像或屏幕截图中识别文本
         """
-        self.text_location=()
+
         img =self.screenshot()  # 如果没有提供图像则截取屏幕
         if not isinstance(img, ndarray):  # 检查图像类型
             self.log.error("Error: img is not a ndarray object")
@@ -111,7 +110,11 @@ class Controller:
         异常:
             ConnectError: 连接失败时抛出
         """
+        start_time=time.time()
         while True:  # 持续尝试连接直到成功
+            if time.time()-start_time >timeout:
+                self.log.error("连接模拟器超时，请检查serial号或先启动模拟器后启动脚本")
+                raise TimeoutError
             try:
                 device = u2.connect(serial=self.serial)  # 尝试连接设备
                 self.log.info("Connect to device successfully.")
@@ -134,7 +137,7 @@ class Controller:
         ...
 
     def wait(self,
-             target_or_targets: Union[int, str, Dict[str, Callable]],
+             target_or_targets: Union[float, str, Dict[str, Callable]],
              identify_area: Optional[Tuple[float, float, float, float]] = None,
              timeout: int = 30) -> 'Controller':
         """
@@ -153,7 +156,7 @@ class Controller:
         """
         try:
             # 记录等待开始
-            if isinstance(target_or_targets, int):
+            if isinstance(target_or_targets, float):
                 time.sleep(target_or_targets)
                 return self
             elif isinstance(target_or_targets, dict):
@@ -288,7 +291,7 @@ class Controller:
         """启动模拟器"""
         launch_timeout=self.config.get_value("Emulator","launch_timeout")
         launch_args=self.config.get_value("Emulator","launch_args")
-        subprocess.run([self.emulator_path,launch_args]) # 启动模拟器进程
+        run([self.emulator_path,launch_args]) # 启动模拟器进程
         return self.connect(timeout=launch_timeout)  # 连接设备
 
 if __name__ == "__main__":

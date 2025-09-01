@@ -61,8 +61,10 @@ class Deli:
             self.controller.click(*self.click_pos["暂不更新"])
 
         self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate,"暂不更新":handle_auto_update})
+        self.controller.wait(0.5)
         self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate},
                              self.click_pos["启动模拟"])
+        self.controller.wait(0.5)
         self.controller.wait({ "停止模拟": handle_stop_emulate},
                              self.click_pos["启动模拟"])
     def login(self, username, password):
