@@ -27,20 +27,18 @@ class Config:
             # Setting section
             setting = table()
             setting.add("path", os.getcwd())
-            setting.add("launch_with_windows", False)
             doc.add("Setting", setting)
 
             # Emulator section
             emulator = table()
             emulator.add("serial", "")
+            emulator.add("path", "")
+            emulator.add("launch_args", "-v 0")
+            emulator.add("launch_timeout", 60)
             doc.add("Emulator", emulator)
 
             # Account section (empty by default)
             doc.add("Account", table())
-
-            # App sections
-            doc.add("Deli", table()).add("package_name", "com.delicloud.app.smartoffice")
-            doc.add("Fake_location", table()).add("package_name", "com.lerist.fakelocation")
 
             self._save_config(doc)
             return doc

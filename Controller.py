@@ -1,11 +1,10 @@
-import os
-from io import BytesIO
+import subprocess
 from typing import Optional, Tuple, Dict, Callable, Union, overload  # 导入类型提示相关模块
 import time  # 导入时间模块用于等待操作
 from subprocess import Popen  # 导入子进程模块用于启动模拟器
 import uiautomator2 as u2  # 导入Android设备控制库
-from uiautomator2 import Device, ConnectError  # 导入设备类和连接错误类
-from PIL import Image  # 导入图像处理库
+from uiautomator2 import Device, ConnectError
+from uiautomator2.exceptions import LaunchUiAutomationError
 from Config import Config  # 导入自定义配置模块
 from Log import Log  # 导入自定义日志模块
 from onnxocr.onnx_paddleocr import ONNXPaddleOcr
@@ -31,12 +30,14 @@ class Controller:
 
         # 从配置文件中获取相关设置
         self.emulator_path: str = self.config.get_value('Emulator', 'path')  # 模拟器路径
-        self.serial: str = self.config.get_value('Emulator', 'serial')  # 设备序列号
-        self.launch_with_windows: bool = self.config.get_value('Setting', 'launch_with_windows')
+        self.serial: str = self.config.get_value('Emulator', 'serial')
+        # 设备序列号
         self.ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False).ocr  # 初始化OCR识别器
         self.log= Log("Controller","d").logger # 初始化日志记录器
 
-        self.device: Device = self.connect()  # 连接设备
+
+
+        self.device: Device = self.launch_emulator()  # 连接设备
 
 
     def get_text(self,
@@ -100,7 +101,7 @@ class Controller:
 
 
 
-    def connect(self) -> Device | None:
+    def connect(self,timeout=60) -> Device | None:
         """
         连接到设备
 
@@ -117,6 +118,9 @@ class Controller:
                 return device  # 返回连接成功的设备实例
             except ConnectError:
                 continue  # 连接失败则继续尝试
+            except LaunchUiAutomationError:
+                continue
+
     @overload
     def wait(self,target:int): ...
     @overload  # 方法重载装饰器
@@ -282,8 +286,10 @@ class Controller:
 
     def launch_emulator(self):
         """启动模拟器"""
-        Popen(self.emulator_path)  # 启动模拟器进程
-        self.connect()  # 连接设备
+        launch_timeout=self.config.get_value("Emulator","launch_timeout")
+        launch_args=self.config.get_value("Emulator","launch_args")
+        subprocess.run([self.emulator_path,launch_args]) # 启动模拟器进程
+        return self.connect(timeout=launch_timeout)  # 连接设备
 
 if __name__ == "__main__":
-    controller = Controller().get_text_location("跳过")
+    controller = Controller()

@@ -9,10 +9,11 @@ class Deli:
         self.log = Log("deli").logger
 
         self.program_path = self.config.get_value('Program', 'path', default=None)
-        self.fake_location_package_name = self.config.get_value('Fake_location', 'package_name')
-        self.deli_package_name = self.config.get_value('Deli', 'package_name')
+        self.fake_location_package_name = "com.lerist.fakelocation"
+        self.deli_package_name = "com.delicloud.app.smartoffice"
 
         self.click_pos = {
+            "暂不更新":(560,1744,746,1819),
             "启动模拟": (100, 1100, 300, 1190),
             "停止模拟": (100, 1100, 300, 1190),
             "用户名": (580, 745, 600, 780),
@@ -55,6 +56,11 @@ class Deli:
         def handle_stop_emulate():
             self.log.info("Fake Location启动完成...")
 
+        def handle_auto_update():
+            self.log.info("暂不更新")
+            self.controller.click(*self.click_pos["暂不更新"])
+
+        self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate,"暂不更新":handle_auto_update})
         self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate},
                              self.click_pos["启动模拟"])
         self.controller.wait({ "停止模拟": handle_stop_emulate},
