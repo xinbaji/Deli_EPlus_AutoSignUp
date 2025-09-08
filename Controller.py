@@ -1,13 +1,17 @@
-from subprocess import run
+import subprocess
 from typing import Optional, Tuple, Dict, Callable, Union, overload  # 导入类型提示相关模块
 import time  # 导入时间模块用于等待操作
+
+import adbutils
 import uiautomator2 as u2  # 导入Android设备控制库
 from uiautomator2 import Device, ConnectError
-from uiautomator2.exceptions import LaunchUiAutomationError
+from uiautomator2.exceptions import LaunchUiAutomationError,AdbShellError
+from adbutils.errors import AdbError
 from Config import Config  # 导入自定义配置模块
 from Log import Log  # 导入自定义日志模块
 from onnxocr.onnx_paddleocr import ONNXPaddleOcr
 from numpy import ndarray  # 导入NumPy数组类型
+from threading import Thread
 class Controller:
     def __init__(self) -> None:
         """
@@ -33,14 +37,28 @@ class Controller:
         # 设备序列号
         self.ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False).ocr  # 初始化OCR识别器
         self.log= Log("Controller","d").logger # 初始化日志记录器
-
+        self.click_pos:dict=dict(self.config.get_value("Position"))
         self.text_location = ()
-
-        self.device: Device = self.launch_emulator()  # 连接设备
-
-
+        self.launch_emulator()
+        self.device: Device
+    def reconnect(self,func):
+        def wrapper(*args, **kwargs):
+            try:
+                func(*args, **kwargs) # 返回连接成功的设备实例
+            except ConnectError:
+                self.connect()  # 连接失败则继续尝试
+            except AdbShellError:
+                self.connect()
+            except AdbError as e:
+                if "offline" in str(e):
+                    self.connect()
+            except LaunchUiAutomationError:
+                self.connect()
+        return wrapper
+    def get_screenshot(self):
+        return self.screenshot()
     def get_text(self,
-                img: Optional[ndarray] = None,
+                img: ndarray,
                 identify_area: Optional[Tuple[float, float, float, float]] = None
                ) -> str:
         """
@@ -57,11 +75,6 @@ class Controller:
             TypeError: 当img参数不是PIL.Image.Image类型时抛出
         """
         textlist=""
-        img = img or self.screenshot()  # 如果没有提供图像则截取屏幕
-        if not isinstance(img, ndarray):  # 检查图像类型
-            self.log.error("Error: img is not a ndarray object")
-            raise TypeError("Error: img is not a ndarray object")
-
         if identify_area:
             x1,y1,x2,y2=identify_area# 如果有指定识别区域则裁剪图像
             img = img[int(y1):int(y2), int(x1):int(x2)]
@@ -83,17 +96,23 @@ class Controller:
             self.log.error("Error: img is not a ndarray object")
             raise TypeError("Error: img is not a ndarray object")
         result = self.ocr(img)
+        self.log.debug("target: "+target+"  result: "+str(result))
         if isinstance(result, list) and len(result) > 0:
-            for text in result[0]:
-                if target in text[1][0]:
-                    x1=text[0][0][0][0]
-                    x2=text[0][0][2][0]
-                    y1=text[0][0][0][1]
-                    y2=text[0][0][2][1]
-                    text_location=(x1,y1,x2,y2)
-                    self.temp_identify_area = text_location
+            try:
+                for text in result[0]:
+                    if target in str(text[1][0]):
+                        x1=text[0][0][0]
+                        x2=text[0][2][0]
+                        y1=text[0][0][1]
+                        y2=text[0][2][1]
+                        text_location=(x1,y1,x2,y2)
+                        self.temp_identify_area = text_location
+            except TypeError as e:
+                if "float" in str(e):
+                    self.log.error(e)
 
-                    return self
+
+            return self
         else:
             return None
 
@@ -110,7 +129,10 @@ class Controller:
         异常:
             ConnectError: 连接失败时抛出
         """
+
+
         start_time=time.time()
+        self.log.info("Connecting")
         while True:  # 持续尝试连接直到成功
             if time.time()-start_time >timeout:
                 self.log.error("连接模拟器超时，请检查serial号或先启动模拟器后启动脚本")
@@ -118,27 +140,32 @@ class Controller:
             try:
                 device = u2.connect(serial=self.serial)  # 尝试连接设备
                 self.log.info("Connect to device successfully.")
-                return device  # 返回连接成功的设备实例
+                self.device = device
+                return # 返回连接成功的设备实例
             except ConnectError:
                 continue  # 连接失败则继续尝试
+            except AdbShellError:
+                continue
+            except AdbError as e:
+                if "offline" in str(e):
+                    continue
             except LaunchUiAutomationError:
                 continue
 
     @overload
-    def wait(self,target:int): ...
-    @overload  # 方法重载装饰器
-    def wait(self, target: str, identify_area: Optional[Tuple[float, float, float, float]] = None,
-             timeout: int = 30) -> 'Controller':
-        ...
+    def wait(self,target:int):...
 
-    @overload  # 方法重载装饰器
-    def wait(self, targets: Dict[str, Callable], identify_area: Optional[Tuple[float, float, float, float]] = None,
-             timeout: int = 30) -> 'Controller':
+    @overload
+    def wait(self,target:float): ...
+    @overload
+    def wait(self,target:str):...
+
+    @overload
+    def wait(self, targets: Dict[str, Callable]):
         ...
 
     def wait(self,
-             target_or_targets: Union[float, str, Dict[str, Callable]],
-             identify_area: Optional[Tuple[float, float, float, float]] = None,
+             target_or_targets: Union[int,float, str, Dict[str, Callable]],
              timeout: int = 30) -> 'Controller':
         """
         等待直到检测到目标文本或任一目标文本
@@ -154,65 +181,55 @@ class Controller:
         异常:
             TimeoutError: 超时未找到目标
         """
-        try:
-            # 记录等待开始
-            if isinstance(target_or_targets, float):
-                time.sleep(target_or_targets)
-                return self
-            elif isinstance(target_or_targets, dict):
-                targets_str = ", ".join(target_or_targets.keys())
-                self.log.info(f"等待目标文本: {targets_str}, 超时时间: {timeout}秒")
-            else:
-                self.log.info(f"等待目标文本: {target_or_targets}, 超时时间: {timeout}秒")
+        if isinstance(target_or_targets, int):
+            time.sleep(target_or_targets)
+            return self
+        elif isinstance(target_or_targets, float):
+            time.sleep(target_or_targets)
+            return self
+        elif isinstance(target_or_targets, str):
+            target_or_targets = {target_or_targets: "str"}
+
+        else:
+            targets_str = ", ".join(target_or_targets.keys())
+            self.log.info(f"等待目标文本: {targets_str}, 超时时间: {timeout}秒")
+        start_time = time.time()  # 记录开始时间
+        attempt_count = 0  # 尝试次数
             
-            if identify_area:
-                self.log.debug(f"识别区域: {identify_area}")
-                
-            start_time = time.time()  # 记录开始时间
-            attempt_count = 0  # 尝试次数
-            
-            while time.time() - start_time < timeout:  # 在超时时间内循环
-                attempt_count += 1
-                try:
-                    text = self.get_text(identify_area=identify_area) # 获取识别区域的文本
-                    self.log.debug(f"尝试{attempt_count}次, 识别文本: {text}")
+        while time.time() - start_time < timeout:  # 在超时时间内循环
+            attempt_count += 1
+            try:
+                img = self.get_screenshot()# 如果是字典类型
+                for target, callback in target_or_targets.items():
+                    if target not in self.click_pos.keys():
+                        text = self.get_text(img)
+                    else:
+                        text=self.get_text(img,identify_area=self.click_pos[target])
+
                     elapsed = time.time() - start_time
-                    
-                    if attempt_count % 4 == 0:  # 每4次尝试记录一次日志，避免日志过多
+
+                    if attempt_count % 5 == 0:  # 每4次尝试记录一次日志，避免日志过多
                         self.log.debug(f"第{attempt_count}次尝试, 已用时{elapsed:.1f}秒, 识别文本: {text}")
-    
-                    # 处理不同类型的target_or_targets参数
-                    if isinstance(target_or_targets, dict):  # 如果是字典类型
-                        for target, callback in target_or_targets.items():
-                            if target in text:  # 如果找到目标文本
-                                self.log.info(f"找到目标文本: {target}, 用时{elapsed:.1f}秒")
-                                self.temp_identify_area = identify_area  # 存储识别区域
-                                try:
-                                    callback()  # 执行回调函数
-                                    self.log.debug(f"目标 {target} 的回调函数执行成功")
-                                except Exception as e:
-                                    self.log.error(f"执行回调函数时出错: {str(e)}", exc_info=True)
-                                    raise
-                                return self  # 返回自身以支持链式调用
-                    elif isinstance(target_or_targets, str):  # 如果是字符串类型
-                        if target_or_targets in text:  # 如果找到目标文本
-                            self.log.info(f"找到目标文本: {target_or_targets}, 用时{elapsed:.1f}秒")
-                            self.temp_identify_area = identify_area  # 存储识别区域
-                            return self  # 返回自身以支持链式调用
-                except Exception as e:
-                    self.log.error(f"获取文本时出错: {str(e)}", exc_info=True)
-                    # 继续尝试，不中断循环
-    
-                time.sleep(0.5)  # 避免高频轮询
-    
+                    if target in text:  # 如果找到目标文本
+                        self.log.info(f"找到目标文本: {target}, 用时{elapsed:.1f}秒")
+                        try:
+                            if not isinstance(callback,str):
+                                callback()  # 执行回调函数
+                            self.log.debug(f"目标 {target} 的回调函数执行成功")
+                        except Exception as e:
+                            self.log.error(f"执行回调函数时出错: {str(e)}", exc_info=True)
+                            raise
+                        return self  # 返回自身以支持链式调用
+
+            except Exception as e:
+                self.log.error(f"获取文本时出错: {str(e)}", exc_info=True)
+                # 继续尝试，不中断循环
+
             # 超时处理
-            self.log.warning(f"等待超时: 目标文本未在{timeout}秒内找到")
-            raise TimeoutError(f"Target not found within {timeout} seconds")  # 超时抛出异常
-            
-        except Exception as e:
-            if not isinstance(e, TimeoutError):
-                self.log.error(f"wait方法发生异常: {str(e)}", exc_info=True)
-            raise
+        self.log.error(f"等待超时: 目标文本未在{timeout}秒内找到")
+        raise TimeoutError # 超时抛出异常
+
+
 
     @overload  # 方法重载装饰器
     def click(self) -> None:
@@ -251,7 +268,7 @@ class Controller:
             self.temp_identify_area = None  # 清空临时区域
         else:
             raise ValueError("不支持的参数组合")  # 参数不匹配抛出异常
-
+        self.wait(0.5)
     def swipe(self,
               x1: Union[int, float],
               y1: Union[int, float],
@@ -269,7 +286,7 @@ class Controller:
         """
 
         self.device.drag(int(x1), int(y1), int(x2), int(y2),duration=0.05)# 执行滑动操作
-
+        self.wait(0.1)
     def send_keys(self, string: str):
         """发送文本到设备"""
         self.device.send_keys(string, clear=True)  # 发送文本并清空原有内容
@@ -278,9 +295,10 @@ class Controller:
         """截取设备屏幕"""
         return self.device.screenshot(format='opencv')  # 返回屏幕截图
 
+
     def start_app(self, app_package_name: str):
         """启动指定应用"""
-        self.device.app_start(app_package_name, wait=True)  # 启动应用并等待
+        self.device.app_start(app_package_name)  # 启动应用并等待
 
     def clear_input(self):
         """清空输入框"""
@@ -291,8 +309,10 @@ class Controller:
         """启动模拟器"""
         launch_timeout=self.config.get_value("Emulator","launch_timeout")
         launch_args=self.config.get_value("Emulator","launch_args")
-        run([self.emulator_path,launch_args]) # 启动模拟器进程
-        return self.connect(timeout=launch_timeout)  # 连接设备
+        launch_emulator_num=self.config.get_value("Emulator","launch_emulator_num")
+        Thread(target=subprocess.run,args=([self.emulator_path,launch_args,launch_emulator_num],)).start() # 启动模拟器进程
+        self.connect(timeout=launch_timeout)
+        self.wait("得力")
 
 if __name__ == "__main__":
     controller = Controller()

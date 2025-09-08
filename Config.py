@@ -33,7 +33,8 @@ class Config:
             emulator = table()
             emulator.add("serial", "")
             emulator.add("path", "")
-            emulator.add("launch_args", "-v 0")
+            emulator.add("launch_args", "-v")
+            emulator.add("launch_emulator_num", "0")
             emulator.add("launch_timeout", 60)
             doc.add("Emulator", emulator)
 

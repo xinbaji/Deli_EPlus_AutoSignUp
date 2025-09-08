@@ -12,31 +12,7 @@ class Deli:
         self.fake_location_package_name = "com.lerist.fakelocation"
         self.deli_package_name = "com.delicloud.app.smartoffice"
 
-        self.click_pos = {
-            "不再显示":(566,1755,752,1822),
-            "暂不更新":(560,1744,746,1819),
-            "启动模拟": (100, 1100, 300, 1190),
-            "停止模拟": (100, 1100, 300, 1190),
-            "用户名": (580, 745, 600, 780),
-            "密码": (580, 910, 600, 955),
-            "登录": (480, 1290, 595, 1350),
-            "同意并继续": (630, 1130, 860, 1190),
-            "智能考勤": (330, 600, 530, 655),
-            "刷新": (830, 975, 920, 1020),
-            "不在打卡位置": (425, 1475, 720, 1530),
-            "已在打卡范围": (425, 1475, 720, 1530),
-            "打卡": (490, 1190, 590, 1255),
-            "我的": (860, 1850, 940, 1895),
-            "设置": (200, 1325, 300, 1380),
-            "退出登录": (425, 1815, 655, 1875),
-            "确定": (710, 1125, 815, 1180),
-            "打卡成功": (352, 612, 718, 718),
-            "签退成功": (352, 612, 718, 718),
-            "签到成功": (352, 612, 718, 718),
-            "返回": (71, 146, 121, 196),
-            "登录失效确定": (474, 1048, 600, 1120),
-        }
-
+        self.click_pos = self.config.get_value("Position")
         self.init_fake_location()
 
         for user in self.config.get_userlist():
@@ -50,30 +26,34 @@ class Deli:
     def init_fake_location(self):
         self.controller.start_app(self.fake_location_package_name)
 
-        def handle_ad_on(self):
+        def handle_ad_on():
             self.log.info("出现广告，点击不再显示")
             self.controller.click(*self.click_pos["不再显示"])
+
         def handle_start_emulate():
             self.log.info("点击启动模拟...")
             self.controller.click(*self.click_pos["启动模拟"])
 
         def handle_stop_emulate():
             self.log.info("Fake Location启动完成...")
+            handlers["停止执行"] = None  # 动态添加停止模拟键
 
         def handle_auto_update():
             self.log.info("暂不更新")
             self.controller.click(*self.click_pos["暂不更新"])
 
-        self.controller.wait(
-            {"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate, "暂不更新": handle_auto_update,"不再显示":handle_ad_on})
-        self.controller.wait(0.5)
-        self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate,"暂不更新":handle_auto_update})
-        self.controller.wait(0.5)
-        self.controller.wait({"启动模拟": handle_start_emulate, "停止模拟": handle_stop_emulate},
-                             self.click_pos["启动模拟"])
-        self.controller.wait(0.5)
-        self.controller.wait({ "停止模拟": handle_stop_emulate},
-                             self.click_pos["启动模拟"])
+
+        handlers = {
+            "启动模拟": handle_start_emulate,
+            "暂不更新": handle_auto_update,
+            "不再显示": handle_ad_on,
+            "停止模拟": handle_stop_emulate
+        }
+
+        while True:
+            self.controller.wait(handlers).wait(0.5)
+            if "停止执行" in handlers:
+                break
     def login(self, username, password):
         """
         登录德力E+并执行签到操作
@@ -82,19 +62,17 @@ class Deli:
             username: 用户名/手机号
             password: 密码
         """
-        self.log.info(f"开始执行签到操作: username={username}, password={'*****' if password else None}")
+        self.log.info(f"开始执行签到: username={username}, password={'*****' if password else None}")
         if not username or not password:
             error_msg = "用户名或密码不能为空"
             self.log.error(error_msg)
             raise ValueError(error_msg)
-            
-        self.log.info(f"开始为用户 {username} 执行登录和签到操作")
         
         try:
             def handle_in_sign_area():
                 self.log.info("已在打卡范围内")
                 try:
-                    self.controller.wait("打卡", self.click_pos["打卡"]).click()
+                    self.controller.click(*self.click_pos["打卡"])
                     self.log.info("点击打卡按钮")
                     
                     def handle_sign_success():
@@ -108,7 +86,7 @@ class Deli:
     
                     self.controller.wait(
                         {"打卡成功": handle_sign_success, "签退成功": handle_sign_success, "签到成功": handle_sign_success},
-                        self.click_pos["打卡成功"])
+                        )
                 except Exception as e:
                     self.log.error(f"处理打卡范围内状态失败: {str(e)}")
                     raise
@@ -136,9 +114,9 @@ class Deli:
             def handle_login_success():
                     # 等待智能考勤
                 self.log.info("等待智能考勤页面...")
-                self.controller.wait("智能考勤", self.click_pos["智能考勤"])
+                self.controller.wait("智能考勤").wait(2).click(*self.click_pos["智能考勤"])
                 self.log.info("登录成功，进入智能考勤页面")
-
+                handlers["停止执行"] = None
             def handle_login():
                 self.log.info("检测到登录页面，准备登录")
                 try:
@@ -169,7 +147,7 @@ class Deli:
                     
                     # 等待并点击同意并继续
                     self.log.info("等待同意并继续按钮...")
-                    self.controller.wait("同意并继续", self.click_pos["同意并继续"]).click()
+                    self.controller.wait("同意并继续").wait(1).click(*self.click_pos["同意并继续"])
                     self.log.info("点击同意并继续按钮完成")
                     handle_login_success()
                 except Exception as e:
@@ -178,7 +156,7 @@ class Deli:
 
             def handle_skip():
                 self.controller.get_text_location("跳过").click()
-                self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login}).click()
+                self.controller.wait({"智能考勤":handle_login_success,"登录":handle_login,"确定":handle_sign_invaild_confirm})
 
 
     
@@ -188,8 +166,11 @@ class Deli:
             self.log.info("应用启动成功")
 
             # 等待并点击智能考勤
-
-            self.controller.wait({"确定":handle_sign_invaild_confirm,"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip}).click()
+            handlers={"账号已失效":handle_sign_invaild_confirm,"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip}
+            while True:
+                self.controller.wait(handlers)
+                if "停止执行" in handlers:
+                    break
 
             
             # 等待多种可能的状态
@@ -204,19 +185,16 @@ class Deli:
     
             # 退出账号
             self.log.info("准备退出账号...")
-            self.controller.wait("我的", self.click_pos["我的"]).click()
+            self.controller.wait("我的").wait(1).click(*self.click_pos["我的"])
             self.log.info("点击我的按钮")
-            
-            self.controller.wait("设置", self.click_pos["设置"]).click()
+            self.controller.wait("设置").wait(2).click(*self.click_pos["设置"])
             self.log.info("点击设置按钮")
-            self.controller.wait(2)
-            self.controller.swipe(600, 1600, 900, 500)
+            self.controller.wait(2).swipe(600, 1600, 900, 500)
             self.log.info("向上滑动屏幕")
-            self.controller.wait(1)
-            self.controller.wait("退出登录", self.click_pos["退出登录"]).click()
+            self.controller.wait("退出登录").wait(2).click(*self.click_pos["退出登录"])
             self.log.info("点击退出登录按钮")
             
-            self.controller.wait("确定", self.click_pos["确定"]).click()
+            self.controller.wait("确定").wait(2).click(*self.click_pos["确定"])
             self.log.info("点击确定按钮，退出登录完成")
             
             return True
@@ -229,3 +207,4 @@ class Deli:
 
 if __name__ == "__main__":
     Deli()
+
