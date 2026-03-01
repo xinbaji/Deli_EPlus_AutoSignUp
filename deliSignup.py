@@ -7,7 +7,7 @@ class Deli:
         self.config = Config()
         self.controller = Controller()
         self.log = Log("deli").logger
-
+        self.debugmode=False
         self.program_path = self.config.get_value('Program', 'path', default=None)
         self.fake_location_package_name = "com.lerist.fakelocation"
         self.deli_package_name = "com.delicloud.app.smartoffice"
@@ -166,6 +166,7 @@ class Deli:
             self.log.info("应用启动成功")
 
             # 等待并点击智能考勤
+           
             handlers={"账号已失效":handle_sign_invaild_confirm,"智能考勤":handle_login_success,"登录":handle_login,"跳过":handle_skip}
             while True:
                 self.controller.wait(handlers)
@@ -175,12 +176,19 @@ class Deli:
             
             # 等待多种可能的状态
             self.log.info("等待打卡状态...")
-            self.controller.wait({
-                "已在打卡范围": handle_in_sign_area, 
-                "不在打卡位置": handle_not_in_sign_area,
-                "确定": handle_sign_invaild_confirm, 
-                "登录": handle_login
-            })
+            if self.debugmode:
+                self.controller.wait({
+                    "不在打卡位置": handle_not_in_sign_area,
+                    "确定": handle_sign_invaild_confirm, 
+                    "登录": handle_login
+                })
+            else:
+                self.controller.wait({
+                    "已在打卡范围": handle_in_sign_area, 
+                    "不在打卡位置": handle_not_in_sign_area,
+                    "确定": handle_sign_invaild_confirm, 
+                    "登录": handle_login
+                })
             self.log.info("打卡操作完成")
     
             # 退出账号
