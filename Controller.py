@@ -37,6 +37,7 @@ class Controller:
         # 设备序列号
         self.ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False).ocr  # 初始化OCR识别器
         self.log= Log("Controller","d").logger # 初始化日志记录器
+       
         self.click_pos:dict=dict(self.config.get_value("Position"))
         self.text_location = ()
         self.launch_emulator()
