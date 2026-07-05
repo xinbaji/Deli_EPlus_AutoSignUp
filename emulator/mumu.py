@@ -1,5 +1,5 @@
 import uiautomator2 as u2
-from uiautomator2.exceptions import ConnectError, AdbShellError, LaunchUiAutomationError
+from uiautomator2.exceptions import ConnectError, AdbShellError, LaunchUiAutomationError,XPathElementNotFoundError
 from adbutils.errors import AdbError
 from Setting import Setting
 from Log import Log
@@ -59,8 +59,11 @@ class Mumu:
     
     @only_chained_calls
     def click(self):
-        self.temp_element.click()
-            
+        try:
+            self.temp_element.click()
+        except XPathElementNotFoundError:
+            pass
+
     @only_chained_calls
     def send_keys(self, string: str):
         """发送文本到设备"""
@@ -71,8 +74,6 @@ class Mumu:
    
     def start_emulator(self):
         """启动模拟器"""
-        launch_args=self.config.get_value("Emulator","launch_args")
-        launch_emulator_num=self.config.get_value("Emulator","launch_emulator_num")
         Thread(target=subprocess.run,args=([self.emulator_exe,"-v",Setting.emulator_num],)).start() # 启动模拟器进程
         self.connect()
     
