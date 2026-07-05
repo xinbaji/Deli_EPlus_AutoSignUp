@@ -12,7 +12,7 @@ class Log:
             with open("./log/" + log_file_name + ".txt", "w") as f:
                 f.write("*********deli_AutoSignup log_file************\n")
                 f.close()
-        handler = logging.FileHandler("./log/" + log_file_name + ".txt")
+        handler = logging.FileHandler("./log/" + log_file_name + ".txt",encoding='utf-8')
         handler.setLevel(level=logging.DEBUG)
         formatter = logging.Formatter(
             "%(asctime)s - %(funcName)s - %(levelname)s - %(message)s"

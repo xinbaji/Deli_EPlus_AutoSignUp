@@ -21,7 +21,7 @@ class Deli:
         while True:
             if self.emulator.wait("//android.widget.TextView[@text='跳过']",timeout=0.5).exists():
                 self.emulator.wait("//android.widget.TextView[@text='跳过']",timeout=0.5).click()
-            self.check_login_invaild()
+                self.check_login_invaild()
             if self.emulator.wait("//android.widget.TextView[@text='我的']",timeout=0.3).exists():
                 self.check_login_invaild()
                 self.emulator.wait("//android.widget.TextView[@text='我的']").click()
@@ -53,9 +53,10 @@ class Deli:
         self.emulator.wait("//android.widget.EditText[@text='输入密码']").click()
         self.emulator.wait("//android.widget.EditText[@text='输入密码']").send_keys(password)
         self.emulator.wait("//android.widget.TextView[@text='登录']").click()
+        self.emulator.set_vitual_location()
         self.emulator.wait("//android.widget.TextView[@text='同意并继续']").click()
         self.emulator.wait("//android.widget.TextView[@text='智能考勤']").click()
-        self.emulator.set_vitual_location()
+        
         start_time=time()
         flag_success=False
         while True:
