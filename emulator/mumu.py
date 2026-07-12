@@ -108,8 +108,10 @@ class Mumu:
         sleep(0.1)
         for i in range(0, 14, 1):  # 循环发送删除键
             self.device.press('del')
-        self.device.send_keys(string, clear=True)
-        
+        try:
+            self.device.send_keys(string, clear=True)
+        except Exception as e:
+            pass
    
     def start_emulator(self):
         """启动模拟器"""

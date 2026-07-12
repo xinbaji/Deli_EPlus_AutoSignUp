@@ -429,6 +429,14 @@ class DeliSignupApp:
         self._user_rows = []
         self._current_page = None
         self._sign_started = False
+        self._last_error = None  # (error_msg, traceback_str) 持久化错误状态，切换页面后保持
+
+        # 持久化签到进度状态（切换页面后恢复 UI）
+        self._progress_state = {
+            "current": 0, "total": 0, "action_text": "等待开始签到...", "stage_text": "",
+            "pct": 0,
+            "badge_text": "等待开始", "badge_bg": Win11Colors.STEP_BG, "badge_fg": Win11Colors.ACCENT,
+        }
 
         reload_config()
         Log.add_gui_callback(self._on_log)
@@ -538,6 +546,18 @@ class DeliSignupApp:
 
     # ==================== 页面切换 ====================
     def _show_page(self, page_key):
+        # 离开日志页前，将当前文本框内容保存到缓冲区（防止切换后丢失）
+        if self._current_page == "log" and hasattr(self, 'log_text') and self.log_text.winfo_exists():
+            try:
+                self.log_text.config(state="normal")
+                current_content = self.log_text.get("1.0", "end-1c")
+                if current_content:
+                    # 反向插入缓冲区头部，保证顺序
+                    self._log_buffer.insert(0, current_content)
+                self.log_text.config(state="disabled")
+            except Exception:
+                pass
+
         self._current_page = page_key
         for w in self.content_frame.winfo_children():
             w.destroy()
@@ -672,12 +692,52 @@ class DeliSignupApp:
         )
         self.progress_pct_label.pack(anchor="e")
 
-        # ---- 错误信息区（初始隐藏）----
+        # ---- 错误信息区（初始隐藏，如有持久化错误则恢复显示）----
         self._build_error_block(page)
+        if self._last_error:
+            self._show_error_block(self._last_error[0], self._last_error[1])
 
         # ---- 底部弹性空间 ----
-        spacer = tk.Frame(page, bg=Win11Colors.BG)
-        spacer.pack(fill="both", expand=True)
+        self._home_spacer = tk.Frame(page, bg=Win11Colors.BG)
+        self._home_spacer.pack(fill="both", expand=True)
+
+        # ---- 恢复签到进行中的 UI 状态 ----
+        self._restore_home_state()
+
+    def _restore_home_state(self):
+        """根据持久化状态恢复主页 UI（切换页面后调用）"""
+        ps = self._progress_state
+
+        # 恢复进度信息
+        self._update_step(ps["current"], ps["total"], ps["action_text"], ps["stage_text"])
+
+        # 恢复徽章
+        if hasattr(self, 'sign_status_badge') and self.sign_status_badge.winfo_exists():
+            try:
+                self.sign_status_badge.config(
+                    text=ps["badge_text"], bg=ps["badge_bg"], fg=ps["badge_fg"])
+            except Exception:
+                pass
+
+        # 恢复按钮状态
+        if self._sign_started:
+            try:
+                self.start_btn.config(state="disabled")
+            except Exception:
+                pass
+            try:
+                self.stop_btn.config(state="normal")
+            except Exception:
+                pass
+        else:
+            try:
+                self.start_btn.config(state="normal")
+            except Exception:
+                pass
+            try:
+                self.stop_btn.config(state="disabled")
+            except Exception:
+                pass
 
     def _update_user_preview(self, parent):
         cfg = load_config()
@@ -756,8 +816,11 @@ class DeliSignupApp:
         self.error_solution_label.config(text=solution)
         self._error_traceback = traceback_str
 
-        # 显示错误块
-        self.error_card.pack(fill="x", padx=20, pady=(0, 16), before=self.error_card.master.winfo_children()[-1])
+        # 显示错误块（插入到 spacer 之前）
+        if hasattr(self, '_home_spacer') and self._home_spacer.winfo_exists():
+            self.error_card.pack(fill="x", padx=20, pady=(0, 16), before=self._home_spacer)
+        else:
+            self.error_card.pack(fill="x", padx=20, pady=(0, 16))
 
         # 如果没有 traceback，隐藏按钮
         if traceback_str:
@@ -901,8 +964,13 @@ class DeliSignupApp:
         self.stop_btn.config(state="normal")
         self.status_label.config(text="● 签到中", fg=Win11Colors.ACCENT)
         self.sign_status_badge.config(text="运行中", bg=Win11Colors.ACCENT_LIGHT, fg=Win11Colors.ACCENT)
+        # 持久化徽章状态（切换页面后可恢复）
+        self._progress_state["badge_text"] = "运行中"
+        self._progress_state["badge_bg"] = Win11Colors.ACCENT_LIGHT
+        self._progress_state["badge_fg"] = Win11Colors.ACCENT
 
-        # 隐藏之前的错误信息
+        # 清除之前的错误信息
+        self._last_error = None
         self._hide_error_block()
 
         # 重置进度
@@ -915,6 +983,14 @@ class DeliSignupApp:
 
     def _update_step(self, current, total, action_text, stage_text=""):
         """在主线程更新步骤进度"""
+        # 持久化进度状态（切换页面后可恢复）
+        pct = (current / total) * 100 if total > 0 else 0
+        self._progress_state["current"] = current
+        self._progress_state["total"] = total
+        self._progress_state["action_text"] = action_text
+        self._progress_state["stage_text"] = stage_text
+        self._progress_state["pct"] = pct
+
         def _do():
             if hasattr(self, 'step_number_label') and self.step_number_label.winfo_exists():
                 if total > 0:
@@ -927,7 +1003,6 @@ class DeliSignupApp:
                     display_text = f"{stage_text} - {action_text}"
                 self.current_action_label.config(text=display_text)
             if hasattr(self, 'progress_var') and total > 0:
-                pct = (current / total) * 100
                 self.progress_var.set(pct)
                 if hasattr(self, 'progress_pct_label') and self.progress_pct_label.winfo_exists():
                     self.progress_pct_label.config(text=f"{int(pct)}%")
@@ -1053,19 +1128,18 @@ class DeliSignupApp:
                             self._deli_instance.emulator.wait(
                                 "//android.widget.TextView[@text='打卡']", timeout=0.3
                             ).click()
-                            while not flag_success:
+                            while True:
                                 self._deli_instance._check_stop()
-                                for i in ['打卡成功', '签到成功', '签退成功', '迟到', '早退']:
-                                    if self._deli_instance.emulator.wait(
-                                        "//android.widget.TextView[@text='" + i + "']", timeout=0.1
+                                if self._deli_instance.emulator.wait(
+                                        "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
+                                        timeout=0.3,
                                     ).exists():
-                                        self._deli_instance.emulator.wait(
+                                    self._deli_instance.emulator.wait(
                                             "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
                                             timeout=0.3,
                                         ).click()
-                                        flag_success = True
-                                        self._update_step(base_num + 7, total_stages,
-                                                          f"打卡结果: {i}", f"用户签到 ({idx+1}/{user_count})")
+                                    self._update_step(base_num + 7, total_stages,
+                                                        f"打卡结果: OK", f"用户签到 ({idx+1}/{user_count})")
                                     break
                         else:
                             self._update_step(base_num + 7, total_stages,
@@ -1096,7 +1170,7 @@ class DeliSignupApp:
             self.root.after(0, lambda: self._on_sign_finished(False))
         except Exception as e:
             tb_str = traceback.format_exc()
-            self.root.after(0, lambda tb=tb_str: self._on_sign_finished(False, str(e), tb))
+            self.root.after(0, lambda tb=tb_str, err=e: self._on_sign_finished(False, str(err), tb))
 
     def _on_sign_finished(self, success, error_msg="", traceback_str=""):
         self._sign_started = False
@@ -1110,23 +1184,41 @@ class DeliSignupApp:
             pass
 
         if success:
+            self._last_error = None
             self.status_label.config(text="● 完成", fg=Win11Colors.SUCCESS)
             self.sign_status_badge.config(text="已完成", bg="#e8f5e9", fg=Win11Colors.SUCCESS)
             self._update_step(0, 0, "所有用户签到完成 ✓", "")
             self.progress_var.set(100)
             self.progress_pct_label.config(text="100%")
             self._hide_error_block()
+            self._progress_state["badge_text"] = "已完成"
+            self._progress_state["badge_bg"] = "#e8f5e9"
+            self._progress_state["badge_fg"] = Win11Colors.SUCCESS
         elif error_msg:
+            # 持久化错误状态（切换页面后不丢失）
+            self._last_error = (error_msg, traceback_str)
+            # 将详细错误栈输出到日志系统
+            gui_log = Log("gui").logger
+            gui_log.error(f"签到异常: {error_msg}")
+            if traceback_str:
+                gui_log.error(f"错误栈:\n{traceback_str}")
             self.status_label.config(text="● 错误", fg=Win11Colors.ERROR)
             self.sign_status_badge.config(text="出错", bg="#fce4e4", fg=Win11Colors.ERROR)
             self._update_step(0, 0, f"签到出错: {error_msg}", "")
             # 显示错误信息块
             self._show_error_block(error_msg, traceback_str)
+            self._progress_state["badge_text"] = "出错"
+            self._progress_state["badge_bg"] = "#fce4e4"
+            self._progress_state["badge_fg"] = Win11Colors.ERROR
         else:
+            self._last_error = None
             self.status_label.config(text="● 中断", fg=Win11Colors.WARNING)
             self.sign_status_badge.config(text="已停止", bg="#fff3e0", fg=Win11Colors.WARNING)
             self._update_step(0, 0, "签到已停止", "")
             self._hide_error_block()
+            self._progress_state["badge_text"] = "已停止"
+            self._progress_state["badge_bg"] = "#fff3e0"
+            self._progress_state["badge_fg"] = Win11Colors.WARNING
 
         self._deli_instance = None
 
@@ -1135,6 +1227,9 @@ class DeliSignupApp:
             self._deli_instance.stop()
         self.status_label.config(text="● 停止中", fg=Win11Colors.WARNING)
         self.sign_status_badge.config(text="停止中", bg="#fff3e0", fg=Win11Colors.WARNING)
+        self._progress_state["badge_text"] = "停止中"
+        self._progress_state["badge_bg"] = "#fff3e0"
+        self._progress_state["badge_fg"] = Win11Colors.WARNING
 
     # ==================== 用户管理页 ====================
     def _build_users_page(self):
@@ -1602,6 +1697,7 @@ class DeliSignupApp:
             self._log_buffer.clear()
 
     def _clear_log(self):
+        self._log_buffer.clear()
         if hasattr(self, 'log_text') and self.log_text.winfo_exists():
             self.log_text.config(state="normal")
             self.log_text.delete("1.0", "end")
