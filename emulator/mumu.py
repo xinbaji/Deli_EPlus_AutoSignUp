@@ -1,9 +1,10 @@
+from tkinter import N
 import uiautomator2 as u2
 from uiautomator2.exceptions import ConnectError, AdbShellError, LaunchUiAutomationError,XPathElementNotFoundError
 from adbutils.errors import AdbError
 from Setting import Setting
 from Log import Log
-from time import time
+from time import time, sleep
 import subprocess
 from threading import Thread
 def only_chained_calls(func):
@@ -49,13 +50,50 @@ class Mumu:
             except LaunchUiAutomationError:
                 continue
             
-    def start_app(self, package_name):
-        try:
-            self.device.app_start(package_name)
-            self.log.info(f"启动应用: {package_name}")
-        except Exception as e:
-            self.log.error(f"启动应用失败: {str(e)}")
-            raise
+    def start_app(self, package_name, timeout=120):
+        
+        start_time = time()
+        attempt = 0
+        # 常见启动失败关键字，出现任一则视为启动失败
+        _FAIL_KEYWORDS = [
+            "error", "failed", "unable", "cannot", "not found",
+            "shell output invalid", "exception", "timeout",
+            "refused", "denied", "killed",
+        ]
+        while True:
+            attempt += 1
+            elapsed = time() - start_time
+            if elapsed > timeout:
+                self.log.error(f"启动应用超时（{timeout}秒），已尝试 {attempt} 次")
+                raise TimeoutError(f"启动应用超时：{package_name}")
+
+            try:
+                # 使用 uiautomator2 内置方式启动（内部通过 shell 执行 am start）
+                output = self.device.app_start(package_name)
+                # 检查返回输出中是否包含失败关键字
+                output_str = str(output or "").lower()
+                fail_reason = None
+                for kw in _FAIL_KEYWORDS:
+                    if kw in output_str:
+                        fail_reason = kw
+                        break
+
+                if fail_reason:
+                    self.log.warning(
+                        f"app_start 输出包含失败关键字 '{fail_reason}'（第 {attempt} 次尝试），"
+                        f"继续重试..."
+                    )
+                else:
+                    self.log.info(f"启动应用成功: {package_name}（第 {attempt} 次尝试）")
+                    return
+            except Exception as e:
+                err_str = str(e).lower()
+                self.log.warning(
+                    f"启动应用异常（第 {attempt} 次尝试）: {err_str}，继续重试..."
+                )
+
+            # 等待 2 秒后重试
+            sleep(2)
     
     @only_chained_calls
     def click(self):
@@ -67,6 +105,7 @@ class Mumu:
     @only_chained_calls
     def send_keys(self, string: str):
         """发送文本到设备"""
+        sleep(0.1)
         for i in range(0, 14, 1):  # 循环发送删除键
             self.device.press('del')
         self.device.send_keys(string, clear=True)
@@ -77,27 +116,48 @@ class Mumu:
         Thread(target=subprocess.run,args=([self.emulator_exe,"-v",Setting.emulator_num],)).start() # 启动模拟器进程
         self.connect()
     
-    def set_vitual_location(self, latitude: float=Setting.location.get("latitude"), longitude: float=Setting.location.get("longitude")):
+    def set_vitual_location(self, latitude: float=None, longitude: float=None):
         """设置模拟器的虚拟位置"""
-        
-        command = self.manager_exe+" control -v 0 tool location -lon "+str(longitude)+" -lat "+str(latitude)
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if '"errcode": 0,' in result.stdout:
-            self.log.info(f"设置位置: 纬度 {latitude}, 经度 {longitude}")
+        if latitude is None:
+            latitude = Setting.location.get("latitude", 111)
+        if longitude is None:
+            longitude = Setting.location.get("longitude", 111)
+
+        command = [
+            self.manager_exe, "control", "-v", str(Setting.emulator_num),
+            "tool", "location", "-lon", str(longitude), "-lat", str(latitude)
+        ]
+        self.log.info(f"执行定位命令: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, timeout=15)
+        except subprocess.TimeoutExpired:
+            self.log.error("设置虚拟位置超时")
+            raise RuntimeError("设置虚拟位置超时，请检查 MuMuManager.exe 是否可正常执行")
+
+        output = (result.stdout or "") + (result.stderr or "")
+        if '"errcode": 0' in output or '"errcode":0' in output:
+            self.log.info(f"设置位置成功: 纬度 {latitude}, 经度 {longitude}")
         else:
-            self.log.error(f"设置虚拟位置失败: {result.stderr}")
-            raise
+            err_msg = result.stderr.strip() if result.stderr else result.stdout.strip()
+            if not err_msg:
+                err_msg = f"返回码 {result.returncode}，输出为空"
+            self.log.error(f"设置虚拟位置失败: {err_msg}")
+            raise RuntimeError(f"设置虚拟位置失败: {err_msg}")
         
     def wait(self,xpath,timeout=5):
         """等待元素出现"""
         try:
             self.device.xpath(xpath).wait(timeout=timeout)
-            self.log.info(f"元素出现: {xpath}")
-            self.temp_element = self.device.xpath(xpath)
-            return self
+            
         except Exception as e:
             self.log.error(f"等待元素失败: {str(e)}")
             raise
+        else:
+            self.log.info(f"元素出现: {xpath}")
+            self.temp_element = self.device.xpath(xpath)
+            return self
     @only_chained_calls
     def exists(self):
         """检查元素是否存在"""
