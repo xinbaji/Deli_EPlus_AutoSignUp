@@ -1036,7 +1036,7 @@ class DeliSignupApp:
             # --- 阶段 3: 启动模拟器 ---
             self._update_step(3, total_stages, "正在启动模拟器...", "启动模拟器")
             self._deli_instance.emulator.start_emulator()
-
+            
             # --- 阶段 4: 启动应用 ---
             self._update_step(4, total_stages, "正在启动得力 E+ 应用...", "启动应用")
             self._deli_instance.emulator.start_app(self._deli_instance.deli_package_name)
