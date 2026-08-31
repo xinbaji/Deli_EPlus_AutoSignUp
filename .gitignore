@@ -26,3 +26,7 @@ debug/build/Deli_EPlus_AutoSignUp/localpycs/struct.pyc
 debug/dist/Deli_EPlus_AutoSignUp.exe
 debug/xml/ui_hierarchy_20260712_194057.xml
 debug/xml/ui_hierarchy_20260713_120853.xml
+build
+debug/xml
+Deli_EPlus_AutoSignUp.spec
+dist/Deli_EPlus_AutoSignUp.exe

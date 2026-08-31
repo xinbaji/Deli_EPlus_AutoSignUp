@@ -6,7 +6,7 @@
 import ctypes
 import sys
 import os
-
+from time import sleep
 # ---------- Windows DPI 感知（必须在创建任何 tk 窗口前调用） ----------
 if sys.platform == "win32":
     try:
@@ -1061,7 +1061,24 @@ class DeliSignupApp:
                     self._deli_instance.check_login_invaild()
                     self._deli_instance.emulator.wait("//android.widget.TextView[@text='设置']").click()
                     self._deli_instance.check_login_invaild()
-                    self._deli_instance.emulator.wait("//android.widget.TextView[@text='退出登录']").click()
+                    
+                    
+                    
+                    done=False
+                    sleep(0.2)
+                    self._deli_instance.emulator.device.swipe(515,1662,515,457,duration=0.2)
+                    sleep(0.2)
+                    while True:
+                        if self._deli_instance.emulator.wait(
+                            "//android.widget.TextView[@text='退出登录']"
+                        ).exists():
+                            self._deli_instance.emulator.wait(
+                            "//android.widget.TextView[@text='退出登录']"
+                        ).click()
+                            done=True
+                        if done and self._deli_instance.emulator.wait("//android.widget.TextView[@text='确定']").exists():
+                            break
+                    done=False
                     self._deli_instance.emulator.wait("//android.widget.TextView[@text='确定']").click()
                 if self._deli_instance.emulator.wait(
                     "//android.widget.TextView[@text='登录']", timeout=0.3
@@ -1128,18 +1145,15 @@ class DeliSignupApp:
                             self._deli_instance.emulator.wait(
                                 "//android.widget.TextView[@text='打卡']", timeout=0.3
                             ).click()
+                            done=False
                             while True:
                                 self._deli_instance._check_stop()
-                                if self._deli_instance.emulator.wait(
-                                        "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
-                                        timeout=0.3,
-                                    ).exists():
-                                    self._deli_instance.emulator.wait(
-                                            "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
-                                            timeout=0.3,
-                                        ).click()
+                                if self._deli_instance.emulator.wait("//android.widget.ImageButton",timeout=0.3).exists():
+                                    self._deli_instance.emulator.wait("//android.widget.ImageButton",timeout=0.3).click()
+                                    done=True
                                     self._update_step(base_num + 7, total_stages,
                                                         f"打卡结果: OK", f"用户签到 ({idx+1}/{user_count})")
+                                if done and not self._deli_instance.emulator.wait("//android.widget.ImageButton",timeout=0.3).exists():
                                     break
                         else:
                             self._update_step(base_num + 7, total_stages,
@@ -1160,7 +1174,22 @@ class DeliSignupApp:
                 self._deli_instance._check_stop()
                 self._deli_instance.emulator.wait("//android.widget.TextView[@text='我的']").click()
                 self._deli_instance.emulator.wait("//android.widget.TextView[@text='设置']").click()
-                self._deli_instance.emulator.wait("//android.widget.TextView[@text='退出登录']").click()
+                done=False
+                sleep(0.2)
+                self._deli_instance.emulator.device.swipe(515,1662,515,457,duration=0.2)
+                sleep(0.2)
+                while True:
+                    
+                    if self._deli_instance.emulator.wait(
+                        "//android.widget.TextView[@text='退出登录']"
+                    ).exists():
+                        self._deli_instance.emulator.wait(
+                        "//android.widget.TextView[@text='退出登录']"
+                    ).click()
+                        done=True
+                    if done and self._deli_instance.emulator.wait("//android.widget.TextView[@text='确定']").exists():
+                        break
+                done=False
                 self._deli_instance.emulator.wait("//android.widget.TextView[@text='确定']").click()
 
             self._update_step(total_stages, total_stages, "所有用户签到完成", "完成")

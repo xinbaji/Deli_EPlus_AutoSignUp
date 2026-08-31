@@ -84,22 +84,15 @@ class Deli:
                     ).click()
                     while not flag_success:
                         self._check_stop()
-                        if self.emulator.wait(
-                            "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
-                            timeout=0.3,
-                        ).exists():
+                        #self.emulator.wait("//android.widget.ImageButton").click()
+
+                        if self.emulator.wait("//android.widget.ImageButton").exists():
                             sleep(0.5)
-                            self.emulator.wait(
-                                "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
-                                timeout=0.3,
-                            ).click()
+                            self.emulator.wait("//android.widget.ImageButton").click()
                             done = True
                         if (
                             done
-                            and not self.emulator.wait(
-                                "//android.widget.ImageView[@resource-id='com.delicloud.app.smartoffice:id/iv_close']",
-                                timeout=0.3,
-                            ).exists()
+                            and not self.emulator.wait("//android.widget.ImageButton").exists()
                         ):
                             flag_success = True
                             self.log.info(f"签到完成")
@@ -159,9 +152,21 @@ class Deli:
                         "//android.widget.TextView[@text='设置']"
                     ).click()
                     self.check_login_invaild()
-                    self.emulator.wait(
-                        "//android.widget.TextView[@text='退出登录']"
-                    ).click()
+                    self.emulator.device.swipe(515,1662,515,457,duration=0.2)
+                    sleep(0.2)
+                    done=False
+                    while True:
+                        if self.emulator.wait(
+                            "//android.widget.TextView[@text='退出登录']"
+                        ).exists():
+                            self.emulator.wait(
+                            "//android.widget.TextView[@text='退出登录']"
+                        ).click()
+                            done=True
+                        if done and not self.emulator.wait(
+                            "//android.widget.TextView[@text='退出登录']"
+                        ).exists():
+                            break
                     self.emulator.wait(
                         "//android.widget.TextView[@text='确定']"
                     ).click()
