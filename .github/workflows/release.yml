@@ -28,7 +28,17 @@ jobs:
           pip install pyinstaller
 
       - name: Run tests
-        run: python -m pytest -q
+        shell: pwsh
+        run: |
+          python -m pytest -v --tb=long 2>&1 | Tee-Object -FilePath pytest-output.txt
+          exit $LASTEXITCODE
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output
+          path: pytest-output.txt
 
       - name: Build portable package
         run: python script/build.py
