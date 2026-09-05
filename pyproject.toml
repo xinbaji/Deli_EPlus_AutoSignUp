@@ -1,0 +1,40 @@
+[project]
+name = "deli-eplus-autosignup"
+version = "1.1.0"
+description = "得力E+ 自动签到工具（MuMu 模拟器 / uiautomator2）"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "xinbaji" }]
+license = { text = "MIT" }
+dependencies = [
+    "uiautomator2>=3.7.0",
+    "adbutils>=2.12.0",
+    "pywebview>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/xinbaji/Deli_EPlus_AutoSignUp"
+Repository = "https://github.com/xinbaji/Deli_EPlus_AutoSignUp"
+Issues = "https://github.com/xinbaji/Deli_EPlus_AutoSignUp/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pyinstaller>=6.21",
+]
+
+[project.scripts]
+deli-eplus = "deli_eplus.cli:main"
+deli-eplus-gui = "deli_eplus.gui:main"
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

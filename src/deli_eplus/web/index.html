@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>得力E+ 自动签到</title>
+<link rel="stylesheet" href="icons.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="light">
+<div id="app">
+  <nav id="nav">
+    <div class="brand">
+      <div class="brand-logo"><i class="bi bi-lightning-charge-fill"></i></div>
+      <div class="brand-name">
+        <div class="brand-title">得力E+</div>
+        <div class="brand-sub">自动签到</div>
+      </div>
+    </div>
+
+    <div class="nav-items">
+      <button class="nav-item" data-view="home">
+        <i class="bi bi-house-door nav-ic"></i><span>主页</span>
+      </button>
+      <button class="nav-item" data-view="accounts">
+        <i class="bi bi-people nav-ic"></i><span>账号</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <i class="bi bi-gear nav-ic"></i><span>设置</span>
+      </button>
+    </div>
+
+    <div class="nav-bottom">
+      <button class="nav-item" id="theme-toggle">
+        <i class="bi bi-moon-stars nav-ic" id="theme-ic"></i><span id="theme-label">深色主题</span>
+      </button>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- ============ 主页 ============ -->
+    <section id="view-home" class="view" hidden>
+      <header class="page-header">
+        <h1>主页</h1>
+        <span class="status-chip" id="status-chip">
+          <span class="dot" id="status-dot"></span><span id="status-text">就绪</span>
+        </span>
+      </header>
+
+      <div class="card">
+        <div class="card-title"><i class="bi bi-lightning-charge-fill card-ic"></i>签到控制台</div>
+        <p class="preview" id="preview">加载中…</p>
+        <div class="btn-row">
+          <button class="btn accent" id="btn-start"><i class="bi bi-play-fill"></i>开始签到</button>
+          <button class="btn danger" id="btn-stop" disabled><i class="bi bi-stop-fill"></i>停止</button>
+          <span class="spacer"></span>
+          <button class="btn subtle" id="btn-open-logs"><i class="bi bi-folder2-open"></i>打开日志</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><i class="bi bi-people card-ic"></i>签到状态</div>
+          <span class="caption" id="status-summary">共 0 个账号</span>
+        </div>
+        <div class="status-list" id="status-list">
+          <div class="empty-mini">开始签到后，这里会逐个显示每个账号的进度</div>
+        </div>
+      </div>
+
+      <div class="card error" id="error-card" hidden>
+        <div class="error-head"><i class="bi bi-exclamation-triangle-fill"></i><b id="error-title">签到失败</b></div>
+        <p id="error-message"></p>
+        <div class="btn-row">
+          <button class="btn subtle" id="btn-error-detail" hidden>技术详情</button>
+          <button class="btn subtle" id="btn-error-copy">复制详情</button>
+          <button class="btn subtle" id="btn-error-logs">打开日志</button>
+        </div>
+        <pre id="error-detail" hidden></pre>
+      </div>
+
+      <div class="card grow">
+        <div class="card-head">
+          <div class="card-title"><i class="bi bi-clock-history card-ic"></i>运行动态</div>
+          <button class="btn subtle small" id="btn-follow">暂停滚动</button>
+        </div>
+        <div class="feed" id="feed"><div class="empty-mini">暂无动态</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 账号 ============ -->
+    <section id="view-accounts" class="view" hidden>
+      <header class="page-header"><h1>账号</h1></header>
+      <div class="card grow">
+        <div class="card-head">
+          <div class="card-title"><i class="bi bi-people card-ic"></i>账号列表</div>
+          <div class="btn-row">
+            <button class="btn subtle" id="btn-export"><i class="bi bi-box-arrow-up"></i>导出配置</button>
+            <button class="btn subtle" id="btn-import"><i class="bi bi-box-arrow-down"></i>导入配置</button>
+            <button class="btn accent" id="btn-add"><i class="bi bi-plus-lg"></i>添加账号</button>
+          </div>
+        </div>
+        <div id="account-list" class="account-list"><div class="empty-mini">加载中…</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 设置 ============ -->
+    <section id="view-settings" class="view" hidden>
+      <header class="page-header"><h1>设置</h1></header>
+
+      <div class="card">
+        <div class="card-title"><i class="bi bi-sliders card-ic"></i>模拟器</div>
+        <div class="set-row">
+          <i class="bi bi-pc-display set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">MuMu 安装目录</div>
+            <div class="set-desc">包含 MuMuManager.exe 与 MuMuNxMain.exe 的目录</div>
+          </div>
+        </div>
+        <div class="set-input-row indent">
+          <input type="text" id="set-path" class="input grow" spellcheck="false" autocomplete="off">
+          <i class="bi ok-check" id="path-check" hidden></i>
+          <button class="btn subtle" id="btn-browse">浏览…</button>
+        </div>
+        <div class="set-row">
+          <i class="bi bi-gear set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">实例号与 Serial</div>
+            <div class="set-desc">MuMu 多实例编号；ADB 序列号（默认 127.0.0.1:16384）</div>
+          </div>
+          <input type="text" id="set-num" class="input num" spellcheck="false" autocomplete="off">
+          <input type="text" id="set-serial" class="input" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="btn-row">
+          <span class="caption result" id="emu-result"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="bi bi-geo-alt card-ic"></i>虚拟定位</div>
+        <div class="set-row">
+          <i class="bi bi-geo-alt set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">打卡经纬度</div>
+            <div class="set-desc">考勤点的纬度与经度</div>
+          </div>
+          <input type="text" id="set-lat" class="input num" spellcheck="false" autocomplete="off">
+          <input type="text" id="set-lon" class="input num" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="btn-row">
+          <button class="btn subtle" id="btn-test-loc">测试定位</button>
+          <span class="caption result" id="loc-result"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="bi bi-bug-fill card-ic"></i>开发者</div>
+        <div class="set-row">
+          <i class="bi bi-bug-fill set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">调试签到</div>
+            <div class="set-desc">走完整签到流程，但不会实际打卡；用于验证模拟器与账号配置</div>
+          </div>
+          <button class="btn outline" id="btn-debug"><i class="bi bi-bug-fill"></i>调试签到</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="bi bi-info-circle card-ic"></i>关于</div>
+        <div class="about-row">
+          <span class="about-k">应用</span><span id="about-app"></span>
+          <span class="spacer"></span>
+          <span class="caption" id="update-state"></span>
+          <button class="btn accent small" id="btn-update" hidden>立即更新</button>
+        </div>
+        <div class="update-progress" id="update-progress" hidden>
+          <div class="bar"><div class="fill" id="update-bar"></div></div>
+          <span class="caption" id="update-percent"></span>
+        </div>
+        <div class="about-row">
+          <span class="about-k">下载源</span>
+          <span class="src-group">
+            <button class="pill-btn active" data-src="github" id="src-github">GitHub 源</button>
+            <button class="pill-btn" data-src="mirror" id="src-mirror">国内镜像</button>
+          </span>
+        </div>
+        <div class="about-row"><span class="about-k">作者</span><span id="about-author"></span></div>
+        <div class="about-row"><span class="about-k">仓库</span><a href="#" id="about-repo" class="link"></a></div>
+        <div class="btn-row">
+          <span class="spacer"></span>
+          <button class="btn subtle" id="btn-open-logs2"><i class="bi bi-folder2-open"></i>打开日志文件夹</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 账号 编辑/添加 弹窗 -->
+<div id="modal-mask" class="modal-mask" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="modal-title">添加账号</h3>
+    <label class="field"><span>手机号</span>
+      <input type="text" id="modal-phone" class="input" maxlength="11" spellcheck="false" autocomplete="off">
+    </label>
+    <label class="field"><span>密码</span>
+      <input type="password" id="modal-pwd" class="input" spellcheck="false" autocomplete="off">
+    </label>
+    <p class="caption modal-error" id="modal-error"></p>
+    <div class="btn-row right">
+      <button class="btn subtle" id="modal-cancel">取消</button>
+      <button class="btn accent" id="modal-ok">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div id="confirm-mask" class="modal-mask" hidden>
+  <div class="modal small" role="alertdialog" aria-modal="true">
+    <h3 id="confirm-title">删除账号</h3>
+    <p class="caption" id="confirm-text"></p>
+    <div class="btn-row right">
+      <button class="btn subtle" id="confirm-cancel">取消</button>
+      <button class="btn danger-solid" id="confirm-ok">删除</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

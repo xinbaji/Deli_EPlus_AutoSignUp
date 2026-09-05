@@ -1,32 +1,29 @@
-log
-__pycache__
-debug\xml
-.venv
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 用户数据（配置含账号密码，绝不入库）
 config.json
-debug\\build
-debug\\dist
-debug\Deli_EPlus_AutoSignUp.spec
-debug\xml
-debug/Deli_EPlus_AutoSignUp.spec
-debug/build/.
-debug/build/Deli_EPlus_AutoSignUp/EXE-00.toc
-debug/build/Deli_EPlus_AutoSignUp/Analysis-00.toc
-debug/build/Deli_EPlus_AutoSignUp/base_library.zip
-debug/build/Deli_EPlus_AutoSignUp/Deli_EPlus_AutoSignUp.pkg
-debug/build/Deli_EPlus_AutoSignUp/PKG-00.toc
-debug/build/Deli_EPlus_AutoSignUp/PYZ-00.pyz
-debug/build/Deli_EPlus_AutoSignUp/PYZ-00.toc
-debug/build/Deli_EPlus_AutoSignUp/warn-Deli_EPlus_AutoSignUp.txt
-debug/build/Deli_EPlus_AutoSignUp/xref-Deli_EPlus_AutoSignUp.html
-debug/build/Deli_EPlus_AutoSignUp/localpycs/pyimod01_archive.pyc
-debug/build/Deli_EPlus_AutoSignUp/localpycs/pyimod02_importers.pyc
-debug/build/Deli_EPlus_AutoSignUp/localpycs/pyimod03_ctypes.pyc
-debug/build/Deli_EPlus_AutoSignUp/localpycs/pyimod04_pywin32.pyc
-debug/build/Deli_EPlus_AutoSignUp/localpycs/struct.pyc
-debug/dist/Deli_EPlus_AutoSignUp.exe
-debug/xml/ui_hierarchy_20260712_194057.xml
-debug/xml/ui_hierarchy_20260713_120853.xml
-build
-debug/xml
-Deli_EPlus_AutoSignUp.spec
-dist/Deli_EPlus_AutoSignUp.exe
+config.json.bak-*
+config.json.tmp
+logs/
+log/
+
+# 构建产物
+build/
+dist/
+output/
+
+# 更新暂存
+update/
+*.update.zip
+
+# IDE
+.idea/
+.vscode/

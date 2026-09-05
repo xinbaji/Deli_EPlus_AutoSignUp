@@ -1,0 +1,37 @@
+/* 由 tools/gen_icons_css.py 生成：Bootstrap Icons 子集字形
+   字体文件随应用分发（web/fonts/bootstrap-icons.ttf） */
+@font-face {
+  font-family: 'bootstrap-icons';
+  src: url('fonts/bootstrap-icons.ttf') format('truetype');
+  font-weight: normal; font-style: normal; font-display: block;
+}
+.bi { font-family: 'bootstrap-icons'; font-style: normal;
+      line-height: 1; display: inline-block; vertical-align: -0.125em; }
+.bi-house-door::before { content: '\F423'; }
+.bi-people::before { content: '\F4D0'; }
+.bi-gear::before { content: '\F3E5'; }
+.bi-lightning-charge-fill::before { content: '\F46C'; }
+.bi-moon-stars::before { content: '\F496'; }
+.bi-sun::before { content: '\F5A2'; }
+.bi-play-fill::before { content: '\F4F4'; }
+.bi-stop-fill::before { content: '\F592'; }
+.bi-folder2-open::before { content: '\F3D8'; }
+.bi-clock-history::before { content: '\F292'; }
+.bi-exclamation-triangle-fill::before { content: '\F33A'; }
+.bi-box-arrow-up::before { content: '\F1C6'; }
+.bi-box-arrow-down::before { content: '\F1B9'; }
+.bi-plus-lg::before { content: '\F64D'; }
+.bi-eye::before { content: '\F341'; }
+.bi-eye-slash::before { content: '\F340'; }
+.bi-pencil::before { content: '\F4CB'; }
+.bi-trash3::before { content: '\F78B'; }
+.bi-sliders::before { content: '\F56B'; }
+.bi-pc-display::before { content: '\F6A6'; }
+.bi-geo-alt::before { content: '\F3E8'; }
+.bi-bug-fill::before { content: '\F1DB'; }
+.bi-info-circle::before { content: '\F431'; }
+.bi-check-circle-fill::before { content: '\F26A'; }
+.bi-x-circle-fill::before { content: '\F622'; }
+.bi-arrow-right-short::before { content: '\F135'; }
+.bi-hourglass-split::before { content: '\F41F'; }
+.bi-search::before { content: '\F52A'; }

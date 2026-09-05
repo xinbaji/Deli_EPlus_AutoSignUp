@@ -1,120 +1,77 @@
-# Deli_EPlus_AutoSignup
+# Deli_EPlus_AutoSignUp
 
-得力 E+ 自动签到工具，支持命令行版和 GUI 版两种运行方式。
+得力 E+ 自动签到工具。控制 MuMu 模拟器完成「登录 → 虚拟定位 → 打卡 → 登出」全流程，
+支持多账号顺序执行，提供 GUI 与 CLI 两种使用方式。
+
+- 作者：**xinbaji**
+- 仓库：<https://github.com/xinbaji/Deli_EPlus_AutoSignUp>
+- 问题反馈：<https://github.com/xinbaji/Deli_EPlus_AutoSignUp/issues>
 
 ---
-## 零、EXE版本
-### 1. 下载 MuMu 模拟器
-* 修改模拟器设置：
-  * 性能设置 -> 选择高性能
 
-### 2. 安装得力 E+
-### 3. 打开exe填写用户信息和设置项
-### 4.enjoy
+## 一、EXE 版（普通用户）
 
-## 一、命令行版本
+1. 下载安装 [MuMu 模拟器](https://mumu.163.com/)，并在模拟器设置中开启 ROOT 与 ADB 调试。
+2. 从 [Releases](https://github.com/xinbaji/Deli_EPlus_AutoSignUp/releases) 下载便携 zip，解压后运行 `Deli_EPlus_AutoSignUp.exe`（Win10/11 自带 WebView2，无需安装）。
+3. 首次使用按顺序配置：
+   - **设置页 → 模拟器**：选择 MuMu 安装目录，点「一键检测」确认 ADB 可连接；
+   - **设置页 → 虚拟定位**：填写考勤点经纬度，可点「测试定位」验证；
+   - **账号页**：添加手机号与密码（配置保存在 exe 旁边的 `config.json`，可随时导出/导入备份）。
+4. 回到主页点「开始签到」。左侧状态列表实时显示每个账号进度，下方「运行动态」展示每一步动作。
+5. 出错时会在页面弹出错误卡片，含原因与建议；详细日志在 `logs/` 目录，反馈问题时请附带。
 
-### 1. 下载 MuMu 模拟器
-* 修改模拟器设置：
-  * 性能设置 -> 选择高性能
+## 二、开发环境
 
-### 2. 安装得力 E+
+```bash
+# 1. 创建虚拟环境并安装依赖（含 pytest / pyinstaller）
+python -m venv .venv
+.venv/Scripts/pip install -e ".[dev]"
 
-### 3. 配置运行环境
-* 下载 Python，推荐 3.14.2 版本
-* 下载源码
-* 运行 CMD，目录为源码根目录
-* 复制命令到命令行中运行：
+# 2. 运行测试（全部用假设备，无需模拟器）
+.venv/Scripts/pytest
 
-        pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple -r requirements.txt
+# 3. 启动 GUI / CLI
+.venv/Scripts/python -m deli_eplus.gui
+.venv/Scripts/python -m deli_eplus --debug     # 调试签到：不实际打卡
 
-### 4. 填写配置
-编辑 `config.json`（首次运行自动生成）：
-
-```json
-{
-  "serial": "127.0.0.1:16384",
-  "emulator_path": "C:\\Program Files\\NetEase\\MuMu\\nx_main",
-  "emulator_num": "0",
-  "location": {"latitude": 111, "longitude": 111},
-  "users": {
-    "你的账号": "你的密码"
-  },
-  "debugmode": false
-}
+# 4. 打包
+.venv/Scripts/python scripts/build.py          # 目录版 + 便携 zip（发 release 用）
 ```
+
+## 三、项目结构
+
+```
+├── src/deli_eplus/
+│   ├── gui.py / cli.py          两个入口（GUI 打包为 exe；CLI 供无界面场景）
+│   ├── config.py                config.json 读写（原子保存 / 损坏自动备份 / 导入导出）
+│   ├── log.py                   一套 logging 三处输出：控制台 / 按天轮转文件 / UI 活动流
+│   ├── device/                  ★ 设备操作层，不依赖业务，可整体复用
+│   │   ├── base.py              find/exists/wait_any/wait_gone/click/type_text（真等待语义）
+│   │   ├── mumu.py              MuMu 专属：启动模拟器、MuMuManager 虚拟定位
+│   │   └── exceptions.py        类型化异常
+│   ├── core/signup.py           唯一签到流程（GUI 与 CLI 共用）
+│   ├── webui.py                 pywebview 窗口 + JS API 桥 + 事件推送
+│   └── web/                     前端（Fluent 2 设计语言，纯 HTML/CSS/JS，零构建步骤）
+├── tests/                       pytest 测试（ScriptedDevice / FakeU2，秒级跑完）
+├── tools/                       dump_ui.py 排查选择器；gen_icons_css.py 生成图标样式
+├── scripts/                     打包：spec + build.py + installer.iss
+└── assets/fonts/                Bootstrap Icons 字体源（生成 web/fonts 的图标样式）
+```
+
+## 四、config.json 字段
 
 | 字段 | 说明 |
-|------|------|
-| `serial` | ADB 连接的模拟器序列号 |
-| `emulator_path` | MuMu 模拟器安装路径 |
-| `emulator_num` | 模拟器编号 |
-| `location` | 模拟器虚拟位置（纬度和经度） |
-| `users` | 账号密码，可添加多个 |
-| `debugmode` | 调试模式（true 时不实际打卡） |
+|---|---|
+| `serial` | adb 序列号，MuMu 默认 `127.0.0.1:16384` |
+| `emulator_path` | MuMu 安装目录（包含 `MuMuManager.exe`） |
+| `emulator_num` | MuMu 实例号 |
+| `location` | 打卡经纬度 `{"latitude": 45.0, "longitude": 45.0}` |
+| `users` | 账号 `{"手机号": "密码"}` |
 
-### 5. 运行 deliSignup.py
-```
-python deliSignup.py
-```
+配置文件损坏时会自动备份为 `config.json.bak-<时间戳>` 并用默认值启动，不会静默覆写。
 
----
+## 五、常见问题
 
-## 二、GUI 版本(源码启动)
-
-GUI 版基于 tkinter，采用 Win11 风格界面，无需手动编辑配置文件。
-
-### 1. 环境准备
-与命令行版本一致，需完成：
-- 安装 MuMu 模拟器并安装得力 E+
-- 安装 Python 3.x
-- 安装依赖：`pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple -r requirements.txt`
-
-### 2. 启动 GUI
-```
-python gui.py
-```
-
-### 3. 界面说明
-GUI 分为四个选项卡：
-
-#### 主页 — 签到控制台
-- 显示待签到用户预览
-- 进度条实时展示签到步骤（初始化 -> 连接模拟器 -> 启动应用 -> 逐个用户签到）
-- **开始签到** / **停止签到** 按钮控制流程
-- 调试模式开启时显示黄色警告条
-- 签到失败自动显示错误分析和解决方案
-
-#### 用户管理
-- 表格形式管理账号密码
-- 支持添加 / 删除用户
-- 密码框支持显示/隐藏切换
-- 修改后点击 **保存用户** 生效
-- 页面顶部显示保存状态（已保存 / 未保存）
-
-#### 设置
-- **MuMu 模拟器路径**：可手动输入或点击"浏览"选择目录
-- **ADB 序列号**：默认为 `127.0.0.1:16384`
-- **模拟器编号**：多开时指定编号
-- **调试模式**：勾选后不执行实际打卡，仅模拟流程
-- **虚拟定位**：设置纬度和经度
-- 修改后自动保存（无感保存），也可点击 **保存设置** 手动保存并验证
-- 设置项验证：路径是否存在、经纬度范围、序号格式等，错误实时提示
-
-#### 日志
-- 实时显示签到运行日志
-- 支持 **清空** 和 **导出** 日志
-- 导出文件保存到项目 `log/` 目录，以日志时间命名
-
-### 4. 注意事项
-
-1. **首次使用**：请先在「设置」页配置 MuMu 模拟器路径和「用户管理」页添加账号密码，否则点击签到会提示跳转。
-2. **调试模式**：默认开启（`debugmode: false`），建议先以调试模式验证流程正常后再关闭进行真实打卡。
-3. **模拟器就绪**：开始签到前确保 MuMu 模拟器已启动，否则 ADB 连接会失败。
-4. **定位精度**：虚拟定位的经纬度需在打卡范围内，否则会一直刷新位置直到 90 秒超时。
-5. **关闭窗口**：关闭 GUI 窗口会自动停止正在进行的签到流程。
-6. **多用户签到**：用户管理中添加的多个账号会依次签到，每个用户签到后自动退出登录并切换下一个。
-7. **管理员权限**：如果虚拟定位设置失败（MuMuManager.exe 调用异常），请尝试以管理员权限运行 GUI。
-8. **配置文件共享**：GUI 版和命令行版共用 `config.json`，修改会相互影响。
-9. **DPI 缩放**：GUI 已启用 Windows DPI 感知，高分辨率屏幕下不会模糊。
-10. **日志持久化**：运行日志不自动保存到文件，如需留存请在「日志」页点击 **导出**。
+- **提示"等待元素超时"**：App 界面与预期不符（版本更新改版/弹窗），可用 `tools/dump_ui.py` 抓界面层级核对选择器。
+- **提示"模拟器启动后仍无法连接"**：确认 MuMu 能手动打开、ADB 调试已开启、设置页 serial 与模拟器实例一致。
+- **卡死了怎么办**：所有等待都有超时，卡死会在超时后转为明确报错并标记该账号失败，不会无限挂起。
