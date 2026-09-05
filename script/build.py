@@ -18,6 +18,11 @@ import time
 import zipfile
 from pathlib import Path
 
+# 非 UTF-8 控制台（如 CI 的 cp1252）下 print 中文不再报错
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parents[1]
 APP_NAME = "Deli_EPlus_AutoSignUp"
 SPEC = ROOT / "script" / "Deli_EPlus.spec"
