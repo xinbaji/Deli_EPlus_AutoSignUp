@@ -30,8 +30,15 @@ jobs:
       - name: Run tests
         shell: pwsh
         run: |
-          python -m pytest -v --tb=long 2>&1 | Tee-Object -FilePath pytest-output.txt
-          exit $LASTEXITCODE
+          python -m pytest -v --tb=short 2>&1 | Tee-Object -FilePath pytest-output.txt
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            Get-Content pytest-output.txt -Tail 40 | ForEach-Object {
+              $line = $_ -replace '%', '%25'
+              Write-Output "::error::$line"
+            }
+          }
+          exit $code
 
       - name: Upload test log
         if: failure()
