@@ -57,7 +57,8 @@ def make_portable_zip(dist_dir: Path) -> Path:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for file in sorted(dist_dir.rglob("*")):
             if file.is_file():
-                zf.write(file, file.relative_to(dist_dir.parent))
+                # 文件放 zip 根层：自动更新解压时直接覆盖安装目录
+                zf.write(file, file.relative_to(dist_dir))
     print(f"   压缩完成（{time.time() - t0:.0f}s）")
     return zip_path
 
