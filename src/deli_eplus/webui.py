@@ -251,7 +251,7 @@ class Api:
             self._log.info("下载更新 %s …", info["tag"])
             try:
                 updater.download(
-                    info["asset_url"], dest,
+                    info["asset_urls"], dest,
                     progress=lambda pct: self._push(
                         "update", {"status": "progress", "percent": pct}),
                 )

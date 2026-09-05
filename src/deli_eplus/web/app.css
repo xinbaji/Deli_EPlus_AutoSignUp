@@ -321,7 +321,7 @@ body.dark .btn.danger-solid { color: #0b0b0b; }
 .result.ok { color: var(--success); }
 .result.bad { color: var(--danger); }
 
-.about-row { display: flex; gap: 16px; padding: 7px 0; font-size: 13px; }
+.about-row { display: flex; align-items: center; gap: 16px; padding: 8px 0; font-size: 13px; }
 .about-k { width: 40px; color: var(--text-3); flex: none; }
 .link { color: var(--accent); text-decoration: none; cursor: pointer; }
 .link:hover { text-decoration: underline; }

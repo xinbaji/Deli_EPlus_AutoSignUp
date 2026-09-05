@@ -113,7 +113,6 @@ function applyTheme(dark, animate) {
 function bindHome() {
   $("btn-start").addEventListener("click", () => startSignup(false));
   $("btn-stop").addEventListener("click", stopSignup);
-  $("btn-open-logs").addEventListener("click", () => window.pywebview.api.open_logs());
   $("btn-open-logs2").addEventListener("click", () => window.pywebview.api.open_logs());
   $("btn-follow").addEventListener("click", toggleFollow);
   $("btn-error-logs").addEventListener("click", () => window.pywebview.api.open_logs());
