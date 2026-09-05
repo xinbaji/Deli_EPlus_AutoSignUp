@@ -46,14 +46,18 @@ jobs:
           name: pytest-output
           path: pytest-output.txt
 
+      - name: Disable Defender realtime (avoid PyInstaller exe quarantine flake)
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
       - name: Build portable package
         shell: pwsh
         run: |
           python script/build.py 2>&1 | Tee-Object -FilePath build-output.txt
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            Get-Content build-output.txt -Tail 30 | ForEach-Object {
-              Write-Output "::error::$_"
+            Get-Content build-output.txt -Tail 60 | Select-Object -Last 40 | ForEach-Object {
+              if ($_) { Write-Output ("::error::" + $_.Substring(0, [Math]::Min(300, $_.Length))) }
             }
           }
           exit $code

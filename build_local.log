@@ -1,0 +1,110 @@
+141 INFO: PyInstaller: 6.22.2, contrib hooks: 2026.6
+141 INFO: Python: 3.12.13
+183 INFO: Platform: Windows-11-10.0.26100-SP0
+183 INFO: Python environment: C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\.venv312
+239 WARNING: Failed to collect submodules for 'uiautomator2.ext.info' because importing 'uiautomator2.ext.info' raised: ImportError: cannot import name 'UIAutomatorServer' from 'uiautomator2' (C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\.venv312\Lib\site-packages\uiautomator2\__init__.py). Did you mean: 'UiAutomationError'?
+141 WARNING: Failed to collect submodules for 'webview.platforms.android' because importing 'webview.platforms.android' raised: ModuleNotFoundError: No module named 'android'
+1867 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp',
+ 'C:\\Users\\cyh\\AppData\\Roaming\\uv\\data\\python\\cpython-3.12-windows-x86_64-none\\python312.zip',
+ 'C:\\Users\\cyh\\AppData\\Roaming\\uv\\data\\python\\cpython-3.12-windows-x86_64-none\\DLLs',
+ 'C:\\Users\\cyh\\AppData\\Roaming\\uv\\data\\python\\cpython-3.12-windows-x86_64-none\\Lib',
+ 'C:\\Users\\cyh\\AppData\\Roaming\\uv\\data\\python\\cpython-3.12-windows-x86_64-none',
+ 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312',
+ 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages',
+ 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\src',
+ 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\script',
+ 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\src']
+2263 INFO: Appending 'datas' from .spec
+2263 INFO: checking Analysis
+2270 INFO: Building because excludes changed
+2270 INFO: Looking for Python shared library...
+2270 INFO: Using Python shared library: C:\Users\cyh\AppData\Roaming\uv\data\python\cpython-3.12-windows-x86_64-none\python312.dll
+2271 INFO: Running Analysis Analysis-00.toc
+2271 INFO: Target bytecode optimization level: 0
+2271 INFO: Initializing module dependency graph...
+2272 INFO: Initializing module graph hook caches...
+2284 INFO: Analyzing modules for base_library.zip ...
+3468 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+4020 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+4735 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+5399 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+5742 INFO: Caching module dependency graph...
+5770 INFO: Analyzing C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\script\run_gui.py
+5933 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+5949 INFO: Processing standard module hook 'hook-webview.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\webview\\__pyinstaller'
+6010 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+6397 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+6604 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+7253 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+7254 INFO: SetuptoolsInfo: initializing cached setuptools info...
+8110 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+8206 INFO: Processing standard module hook 'hook-clr.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\pythonnet\\_pyinstaller'
+8284 INFO: Processing standard module hook 'hook-clr_loader.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+8359 INFO: Processing standard module hook 'hook-pycparser.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+8461 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+8515 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+8659 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+8673 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+8902 INFO: Processing standard module hook 'hook-adbutils.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+8912 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+8973 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+9058 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+9582 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+9750 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+9823 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+9823 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+10101 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+10137 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+10303 INFO: Processing standard module hook 'hook-lxml.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+10685 INFO: Processing standard module hook 'hook-lxml.etree.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+10714 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+10847 INFO: Analyzing hidden import 'uiautomator2.__main__'
+10863 INFO: Analyzing hidden import 'uiautomator2.agent_cli'
+10864 INFO: Analyzing hidden import 'uiautomator2.agent_cli.__main__'
+11032 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+11156 INFO: Analyzing hidden import 'uiautomator2.ext'
+11157 INFO: Analyzing hidden import 'uiautomator2.ext.htmlreport'
+11162 INFO: Analyzing hidden import 'uiautomator2.ext.perf'
+11172 INFO: Analyzing hidden import 'adbutils.__main__'
+11183 INFO: Analyzing hidden import 'adbutils.binaries'
+11184 INFO: Analyzing hidden import 'adbutils.pidcat'
+11192 INFO: Analyzing hidden import 'deli_eplus.__main__'
+11195 INFO: Analyzing hidden import 'webview.__pyinstaller'
+11195 INFO: Analyzing hidden import 'webview.__pyinstaller.hook-webview'
+11298 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+11298 INFO: Setuptools: 'importlib_metadata' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.importlib_metadata'!
+11306 INFO: Processing standard module hook 'hook-win32ctypes.core.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+12755 INFO: Analyzing hidden import 'webview._version'
+12755 INFO: Processing module hooks (post-graph stage)...
+13067 INFO: Processing standard module hook 'hook-lxml.isoschematron.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+13110 WARNING: Hidden import "pycparser.lextab" not found!
+13111 WARNING: Hidden import "pycparser.yacctab" not found!
+13314 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks'
+13378 INFO: Processing standard module hook 'hook-lxml.objectify.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+13384 INFO: Performing binary vs. data reclassification (135 entries)
+13438 INFO: Looking for ctypes DLLs
+13479 INFO: Analyzing run-time hooks ...
+13481 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+13483 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+13485 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\cyh\\Desktop\\Deli_EPlus_AutoSignUp\\.venv312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+13496 INFO: Creating base_library.zip...
+13511 INFO: Looking for dynamic libraries
+14143 INFO: Extra DLL search directories (AddDllDirectory): []
+14143 INFO: Extra DLL search directories (PATH): []
+14849 INFO: Warnings written to C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\build\Deli_EPlus\warn-Deli_EPlus.txt
+14906 INFO: Graph cross-reference written to C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\build\Deli_EPlus\xref-Deli_EPlus.html
+14929 INFO: checking PYZ
+14964 INFO: checking PKG
+14965 INFO: Bootloader C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\.venv312\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+14965 INFO: checking EXE
+14966 INFO: checking COLLECT
+14970 INFO: Building COLLECT COLLECT-00.toc
+15267 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+15270 INFO: Build complete! The results are available in: C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\dist
+>> C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\.venv312\Scripts\python.exe -m PyInstaller C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\script\Deli_EPlus.spec --noconfirm --distpath C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\dist --workpath C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\build
+>> 打包便携 zip: Deli_EPlus_AutoSignUp_portable.zip
+   压缩完成（5s）
+
+目录版: 49.1 MB  (C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\dist\Deli_EPlus_AutoSignUp)
+便携包: 22.9 MB  (C:\Users\cyh\Desktop\Deli_EPlus_AutoSignUp\dist\Deli_EPlus_AutoSignUp_portable.zip)
