@@ -1,6 +1,6 @@
 [project]
 name = "deli-eplus-autosignup"
-version = "1.1.0"
+version = "1.2.0"
 description = "得力E+ 自动签到工具（MuMu 模拟器 / uiautomator2）"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP_NAME = "Deli_EPlus_AutoSignUp"
 SPEC = ROOT / "script" / "Deli_EPlus.spec"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 
 def run_pyinstaller() -> Path:
