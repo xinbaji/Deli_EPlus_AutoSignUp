@@ -47,7 +47,16 @@ jobs:
           path: pytest-output.txt
 
       - name: Build portable package
-        run: python script/build.py
+        shell: pwsh
+        run: |
+          python script/build.py 2>&1 | Tee-Object -FilePath build-output.txt
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            Get-Content build-output.txt -Tail 30 | ForEach-Object {
+              Write-Output "::error::$_"
+            }
+          }
+          exit $code
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
