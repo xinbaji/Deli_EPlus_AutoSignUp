@@ -56,8 +56,12 @@ jobs:
           python script/build.py 2>&1 | Tee-Object -FilePath build-output.txt
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            Get-Content build-output.txt -Tail 60 | Select-Object -Last 40 | ForEach-Object {
-              if ($_) { Write-Output ("::error::" + $_.Substring(0, [Math]::Min(300, $_.Length))) }
+            Get-Content build-output.txt | Select-String -Pattern "ERROR|Traceback|Exception|raise |FileNotFound|Permission" | Select-Object -Last 12 | ForEach-Object {
+              $line = $_.Line
+              Write-Output ("::error::" + $line.Substring(0, [Math]::Min(320, $line.Length)))
+            }
+            Get-Content build-output.txt -Tail 12 | ForEach-Object {
+              if ($_) { Write-Output ("::error::TAIL " + $_.Substring(0, [Math]::Min(280, $_.Length))) }
             }
           }
           exit $code
