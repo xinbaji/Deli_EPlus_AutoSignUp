@@ -27,14 +27,15 @@ TIMEOUT_DOWNLOAD = 30
 # 候选源（顺序即默认回退顺序）：前缀 + 固定 API 地址
 _API_PREFIXES = [
     ("github", ""),                                    # 直连 api.github.com
-    ("mirror", "https://gh-proxy.com/"),
-    ("ghproxy.net", "https://ghproxy.net/"),
-    ("ghproxy.cn", "https://ghproxy.cn/"),
+    ("mirror", "https://api.gitproxy.dev/"),           # 实测最快且 API 可反代
+    ("mirror2", "https://gh-proxy.com/"),
+    ("mirror3", "https://ghproxy.net/"),
+    ("mirror4", "https://ghproxy.cn/"),
 ]
 _API_BASE = f"https://api.github.com/repos/{REPO}/releases/latest"
 _DOWNLOAD_TEMPLATE = "https://github.com/{repo}/releases/download/{tag}/{asset}"
-_MIRROR_PREFIXES = ["", "https://gh-proxy.com/", "https://ghproxy.net/",
-                    "https://ghproxy.cn/"]
+_MIRROR_PREFIXES = ["", "https://api.gitproxy.dev/", "https://gh-proxy.com/",
+                    "https://ghproxy.net/", "https://ghproxy.cn/"]
 
 
 def normalize_source(source: str) -> str:
@@ -43,7 +44,7 @@ def normalize_source(source: str) -> str:
 
 def _ordered(prefixes: list[str], preferred: str) -> list[str]:
     """把用户选的源排到最前，其余作为自动回退。"""
-    preferred_prefix = "https://gh-proxy.com/" if preferred == "mirror" else ""
+    preferred_prefix = ("https://api.gitproxy.dev/" if preferred == "mirror" else "")
     ordered = [p for p in prefixes if p == preferred_prefix]
     ordered += [p for p in prefixes if p != preferred_prefix]
     return ordered

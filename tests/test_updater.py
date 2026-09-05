@@ -59,11 +59,12 @@ def test_latest_release_github(monkeypatch):
     assert info["asset_urls"][0] == updater._DOWNLOAD_TEMPLATE.format(
         repo=updater.REPO, tag="v1.2.3", asset=updater.ASSET_NAME)
     assert "api.github.com" in captured["url"]
-    # 回退链：直连在前，gh-proxy 其次
-    assert info["asset_urls"][1].startswith("https://gh-proxy.com/")
+    # 回退链：直连在前，gitproxy.dev 其次，gh-proxy 再次
+    assert info["asset_urls"][1].startswith("https://api.gitproxy.dev/")
+    assert info["asset_urls"][2].startswith("https://gh-proxy.com/")
 
 
-def test_latest_release_mirror_prefers_proxy_api(monkeypatch):
+def test_latest_release_mirror_prefers_gitproxy(monkeypatch):
     captured = {}
 
     def fake_fetch_json(url, timeout):
@@ -72,7 +73,7 @@ def test_latest_release_mirror_prefers_proxy_api(monkeypatch):
 
     monkeypatch.setattr(updater, "_fetch_json", fake_fetch_json)
     updater.latest_release("mirror")
-    assert captured["url"].startswith("https://gh-proxy.com/")
+    assert captured["url"].startswith("https://api.gitproxy.dev/")
 
 
 def test_latest_release_falls_back_when_first_source_down(monkeypatch):
