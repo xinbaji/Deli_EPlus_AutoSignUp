@@ -1,0 +1,107 @@
+name: Build & Release GUI
+
+# 推送带版本号的 commit 到 GUI 分支时，自动打包并发布 Release。
+# 版本号从 commit message 中提取，格式: vX.Y.Z（例如 "feat: xxx v1.1.0"）
+on:
+  push:
+    branches: [GUI]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-gui
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Extract version from commit message
+        id: ver
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const msg = (context.payload.head_commit && context.payload.head_commit.message) || '';
+            const m = msg.match(/\bv(\d+\.\d+\.\d+)\b/);
+            core.setOutput('version', m ? m[1] : '');
+            core.info('Commit message: ' + msg);
+            core.info('Version: ' + (m ? m[1] : '(none, skip release)'));
+
+      - name: Skip when no version in commit message
+        if: steps.ver.outputs.version == ''
+        run: echo "::notice::commit message 不含 vX.Y.Z，跳过打包发布。"
+
+      - name: Install dependencies
+        if: steps.ver.outputs.version != ''
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Clean previous artifacts
+        if: steps.ver.outputs.version != ''
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
+
+      - name: Build single-file EXE (buildexe.py)
+        if: steps.ver.outputs.version != ''
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+        run: python buildexe.py
+
+      - name: Rename EXE with version
+        if: steps.ver.outputs.version != ''
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          Move-Item -Force dist\Deli_EPlus_AutoSignUp.exe "dist\Deli_EPlus_AutoSignUp-v$ver.exe"
+
+      - name: Delete existing release/tag (idempotent republish)
+        if: steps.ver.outputs.version != ''
+        uses: actions/github-script@v7
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        with:
+          script: |
+            const ver = process.env.VER;
+            const repo = { owner: context.repo.owner, repo: context.repo.repo };
+            try {
+              const rel = await github.rest.repos.getReleaseByTag({ ...repo, tag: 'v' + ver });
+              await github.rest.repos.deleteRelease({ ...repo, release_id: rel.data.id });
+              console.log('Deleted existing release v' + ver);
+            } catch (e) {
+              console.log('No existing release v' + ver);
+            }
+            try {
+              await github.rest.git.deleteRef({ ...repo, ref: 'tags/v' + ver });
+              console.log('Deleted existing tag v' + ver);
+            } catch (e) {
+              console.log('No existing tag v' + ver);
+            }
+
+      - name: Publish Release
+        if: steps.ver.outputs.version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Deli_EPlus_AutoSignUp v${{ steps.ver.outputs.version }} GUI
+          body: |
+            GitHub Actions 自动打包发布。
+
+            - 分支: `GUI` @ `${{ github.sha }}`
+            - 触发提交: `${{ github.event.head_commit.message }}`
+            - 单文件 EXE，免安装，用法见 README「EXE版本」。
+          files: dist/Deli_EPlus_AutoSignUp-v${{ steps.ver.outputs.version }}.exe
+          fail_on_unmatched_files: true
