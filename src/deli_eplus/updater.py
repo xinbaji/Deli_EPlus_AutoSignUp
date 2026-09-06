@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import time
 import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
@@ -59,13 +60,15 @@ def _fetch_json(url: str, timeout: float) -> dict:
 def latest_release(preferred: str = "github", timeout: float = TIMEOUT_API) -> Optional[dict]:
     """查询最新 release。返回 {"tag","notes","asset_urls"}；无 release 返回 None。
 
-    按 preferred 优先的顺序尝试所有源，全部失败抛 RuntimeError。
+    按 preferred 优先的顺序尝试所有源。URL 带时间戳穿透镜像 CDN 缓存
+    （gitproxy 曾缓存旧响应导致误报"已是最新"），全部失败抛 RuntimeError。
     """
     preferred = normalize_source(preferred)
+    bust = str(int(time.time()))
     last_error: Optional[Exception] = None
     for prefix in _ordered([p for _, p in _API_PREFIXES], preferred):
         try:
-            data = _fetch_json(prefix + _API_BASE, timeout)
+            data = _fetch_json(f"{prefix}{_API_BASE}?t={bust}", timeout)
         except Exception as e:
             last_error = e
             continue

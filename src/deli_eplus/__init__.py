@@ -7,7 +7,7 @@
 """
 
 APP_NAME = "得力E+ 自动签到"
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 AUTHOR = "xinbaji"
 REPO_URL = "https://github.com/xinbaji/Deli_EPlus_AutoSignUp"
 

@@ -59,6 +59,7 @@ def test_latest_release_github(monkeypatch):
     assert info["asset_urls"][0] == updater._DOWNLOAD_TEMPLATE.format(
         repo=updater.REPO, tag="v1.2.3", asset=updater.ASSET_NAME)
     assert "api.github.com" in captured["url"]
+    assert "?t=" in captured["url"]  # cache-buster
     # 回退链：直连在前，gitproxy.dev 其次，gh-proxy 再次
     assert info["asset_urls"][1].startswith("https://api.gitproxy.dev/")
     assert info["asset_urls"][2].startswith("https://gh-proxy.com/")
