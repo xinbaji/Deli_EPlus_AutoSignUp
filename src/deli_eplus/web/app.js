@@ -427,9 +427,10 @@ async function autoSaveEmu() {
   onHomeShow();
   if (path) {
     setPathCheck("detecting");
-    setResult("emu-result", null, "检测模拟器…");
+    setResult("emu-result", null, "检测中…");
     const det = await window.pywebview.api.detect_emulator();
     if (!det.ok) { setPathCheck("bad"); setResult("emu-result", false, det.error); }
+    else { setPathCheck("ok"); setResult("emu-result", true, det.message || "路径正确"); }
   } else {
     setPathCheck("none");
     setResult("emu-result", null, "");
@@ -455,7 +456,7 @@ function setPathCheck(state) {
   if (state === "ok") {
     el.hidden = false; el.className = "bi bi-check-circle-fill ok-check";
   } else if (state === "detecting") {
-    el.hidden = false; el.className = "bi bi-hourglass-split ok-check detecting";
+    el.hidden = false; el.className = "bi bi-arrow-repeat ok-check detecting";
   } else if (state === "bad") {
     el.hidden = false; el.className = "bi bi-x-circle-fill ok-check bad";
   } else {

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -42,10 +41,10 @@ class MuMuDevice(AndroidDevice):
         try:
             out = subprocess.run(
                 ["tasklist", "/FI", f"IMAGENAME eq {MAIN_NAME}"],
-                capture_output=True, text=True, timeout=10,
-            ).stdout.lower()
+                capture_output=True, timeout=10,
+            ).stdout.decode("gbk", errors="ignore").lower()
             return "mumunxmain" in out
-        except (OSError, subprocess.TimeoutExpired):
+        except (OSError, subprocess.TimeoutExpired, ValueError):
             return False
 
     def start_emulator(self, timeout: float = 180) -> None:
@@ -156,23 +155,9 @@ class MuMuDevice(AndroidDevice):
     # ---------- 状态检查（供设置页"一键检测"） ----------
 
     def check_install(self) -> list[str]:
-        """返回问题清单；空列表表示路径与关键文件齐全。"""
-        problems: list[str] = []
-        if not self.emulator_path.is_dir():
-            problems.append(f"目录不存在: {self.emulator_path}")
-            return problems
-        for exe in (self.emulator_exe, self.manager_exe):
-            if not exe.is_file():
-                problems.append(f"缺少 {exe.name}")
-        return problems
-
-    def wait_adb_ready(self, timeout: float = 10) -> bool:
-        """短连接检测设备是否可达（供设置页"一键检测"）。"""
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            try:
-                self.connect(timeout=2)
-                return True
-            except DeviceError:
-                continue
-        return False
+        """路径合法性检测：目录存在且包含 MuMuNxMain.exe 即视为有效。"""
+        if not self.emulator_exe.is_file():
+            if not self.emulator_path.is_dir():
+                return [f"目录不存在: {self.emulator_path}"]
+            return [f"目录里没有 {MAIN_NAME}：{self.emulator_path}"]
+        return []

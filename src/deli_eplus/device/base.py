@@ -77,9 +77,41 @@ class AndroidDevice:
     def connected(self) -> bool:
         return self._u2 is not None
 
-    def connect(self, timeout: float = 60) -> "AndroidDevice":
-        """连接设备直到成功或超时；期间每秒检查一次停止令牌。"""
+    def connect(self, timeout: float = 90) -> "AndroidDevice":
+        """分三阶段连接设备（每阶段动态轮询、细化日志，杜绝长时间无反馈）：
+
+        1. ADB 设备出现在设备列表（秒级快速探测）
+        2. 模拟器系统启动完成（sys.boot_completed，避免盲目撞 u2 重服务）
+        3. uiautomator 服务可用（u2.connect + info）
+        """
         deadline = time.monotonic() + timeout
+        started = time.monotonic()
+
+        # 阶段 1+2：轻量 adbutils 探测（失败快，轮询密）
+        boot_done = False
+        while not boot_done:
+            self._check_stop()
+            try:
+                import adbutils
+
+                client = adbutils.AdbClient(host="127.0.0.1", port=5037)
+                shell_out = client.device(self.serial).shell(
+                    "getprop sys.boot_completed", timeout=5)
+                if str(shell_out).strip() == "1":
+                    boot_done = True
+                    self._log.info("模拟器系统已就绪（%.1f 秒）",
+                                   time.monotonic() - started)
+                    break
+                self._log.info("等待模拟器系统启动完成…")
+            except Exception:
+                self._log.info("等待 ADB 设备 %s 出现…", self.serial)
+            if time.monotonic() >= deadline:
+                raise DeviceConnectionError(
+                    f"连接设备 {self.serial} 超时（{timeout:g} 秒）：请确认模拟器已运行"
+                )
+            time.sleep(1)
+
+        # 阶段 3：u2 重连接（uiautomator 服务就绪即成功）
         while True:
             self._check_stop()
             try:
@@ -88,15 +120,17 @@ class AndroidDevice:
                 device = u2.connect(self.serial)
                 device.info  # 触碰一次，确认 uiautomator 服务可用
                 self._u2 = device
-                self._log.info("ADB 已连接 %s", self.serial)
+                self._log.info("ADB 已连接 %s（%.1f 秒）",
+                               self.serial, time.monotonic() - started)
                 return self
-            except Exception as e:  # u2/adbutils 的瞬态错误种类多，统一按可重试处理
+            except Exception as e:  # uiautomator 服务未就绪等瞬态错误，快速重试
+                self._log.debug("uiautomator 服务未就绪: %r", e)
                 if time.monotonic() >= deadline:
                     raise DeviceConnectionError(
-                        f"连接设备 {self.serial} 超时（{timeout:g} 秒）：请确认模拟器已运行"
-                        f" · 最后错误: {e!r}"
+                        f"连接设备 {self.serial} 超时（{timeout:g} 秒）："
+                        f"uiautomator 服务未就绪 · 最后错误: {e!r}"
                     ) from e
-                time.sleep(1)
+                time.sleep(0.5)
 
     def _require_connected(self):
         if self._u2 is None:
@@ -105,7 +139,7 @@ class AndroidDevice:
 
     # ---------- 应用 ----------
 
-    def start_app(self, package: str, timeout: float = 60) -> None:
+    def start_app(self, package: str, timeout: float = 120) -> None:
         """启动应用并确认到达前台；未安装等永久性错误立即失败，瞬态错误重试。"""
         device = self._require_connected()
         from uiautomator2.exceptions import AppNotFoundError
@@ -117,11 +151,13 @@ class AndroidDevice:
             self._check_stop()
             attempt += 1
             try:
+                self._log.debug("第 %d 次尝试启动应用: %s", attempt, package)
                 device.app_start(package)
                 if device.app_wait(package, timeout=5, front=True):
                     self._log.info("应用已启动: %s（第 %d 次尝试）", package, attempt)
                     return
                 last_error = "启动命令已执行但应用未到前台"
+                self._log.debug("应用未到前台: %s", package)
             except AppNotFoundError as e:
                 raise AppLaunchError(f"应用未安装: {package}") from e
             except Exception as e:
@@ -152,6 +188,9 @@ class AndroidDevice:
                 for index, selector in enumerate(selectors):
                     sel = device.xpath(selector)
                     if sel.exists:  # 一次 dump
+                        waited = time.monotonic() - (deadline - timeout)
+                        self._log.debug("元素已出现: %s（等待 %.1fs）",
+                                        selector, waited)
                         return index, Element(sel.get_last_match(), selector, device)
             except Exception as e:
                 last_error = e
@@ -198,7 +237,7 @@ class AndroidDevice:
     def click(self, selector: Selector, timeout: float = 15) -> Element:
         element = self.find(selector, timeout=timeout)
         element.click()
-        self._log.info("点击: %s", selector)
+        self._log.debug("点击: %s", selector)
         return element
 
     def click_until(self, selector: Selector, until_selector: Selector, *,
@@ -248,7 +287,7 @@ class AndroidDevice:
     def type_text(self, selector: Selector, text: str, timeout: float = 15) -> None:
         element = self.find(selector, timeout=timeout)
         element.clear_and_type(text)
-        self._log.info("输入文本到 %s（%d 字符）", selector, len(text))
+        self._log.debug("输入文本: %s -> %s（%d 字符）", selector, text, len(text))
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.2) -> None:
         device = self._require_connected()

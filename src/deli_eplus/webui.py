@@ -281,30 +281,20 @@ class Api:
             self._window.destroy()
         return {"ok": True}
 
-    # ---------- 检测 ----------
+    # ---------- 模拟器路径检测 ----------
 
     def detect_emulator(self) -> dict[str, Any]:
+        """路径合法性即时判定：目录存在且包含 MuMuNxMain.exe 即通过。"""
         if not self._cfg.emulator_path:
             return self._err(ConfigError("请先填写并保存 MuMu 安装目录"))
         from .device import MuMuDevice
 
-        def work() -> None:
-            device = MuMuDevice(self._cfg.serial, self._cfg.emulator_path,
-                                self._cfg.emulator_num)
-            problems = device.check_install()
-            if problems:
-                self._push("detect", {"target": "emu", "ok": False,
-                                      "message": "；".join(problems)})
-                return
-            ok = device.wait_adb_ready(timeout=8)
-            self._push("detect", {
-                "target": "emu", "ok": ok,
-                "message": "路径正确，ADB 可连接" if ok
-                else "路径正确，但模拟器未运行或 ADB 未就绪",
-            })
-
-        threading.Thread(target=work, daemon=True, name="detect-emu").start()
-        return {"ok": True}
+        device = MuMuDevice(self._cfg.serial, self._cfg.emulator_path,
+                            self._cfg.emulator_num)
+        problems = device.check_install()
+        if problems:
+            return {"ok": False, "error": "；".join(problems)}
+        return {"ok": True, "message": "路径正确"}
 
     def test_location(self, lat: str, lon: str) -> dict[str, Any]:
         try:

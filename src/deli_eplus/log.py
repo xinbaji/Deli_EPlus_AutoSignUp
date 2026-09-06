@@ -1,7 +1,7 @@
 """日志：一套 logging，三处输出。
 
 - 控制台（开发期；PyInstaller 无控制台打包时 sys.stdout 为 None，自动跳过）
-- 文件 logs/deli_eplus.log，按天轮转，保留 14 天（打包后随 exe 走，用户可直接发来排查）
+- 文件 logs/deli_eplus.log，按天轮转，保留 14 天（DEBUG 级，含等待/点击等每步细节）
 - UI 活动流：ActivityFeedHandler 把记录推进有界队列，主线程轮询渲染
 
 使用：`log = get("mumu")`，成功类消息用 `log.success("...")`。
@@ -65,7 +65,7 @@ def logs_dir() -> Path:
     return base_dir() / "logs"
 
 
-def setup(console_level: int = logging.INFO, file_level: int = logging.INFO) -> None:
+def setup(console_level: int = logging.INFO, file_level: int = logging.DEBUG) -> None:
     """初始化根 logger（幂等，重复调用无副作用）。"""
     global _configured, _feed
     with _lock:

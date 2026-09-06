@@ -24,10 +24,13 @@ def device(mumu_dir):
 
 
 def test_missing_paths_reported(tmp_path):
+    """检测语义：目录里只要有 MuMuNxMain.exe 即为合法。"""
     device = MuMuDevice("s", str(tmp_path), "0")
     problems = device.check_install()
     assert any("MuMuNxMain.exe" in p for p in problems)
-    assert any("MuMuManager.exe" in p for p in problems)
+
+    (tmp_path / "MuMuNxMain.exe").write_bytes(b"")
+    assert MuMuDevice("s", str(tmp_path), "0").check_install() == []
 
 
 def test_start_emulator_missing_exe_clear_error(tmp_path):
