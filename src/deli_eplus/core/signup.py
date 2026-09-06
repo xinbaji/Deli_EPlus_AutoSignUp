@@ -14,6 +14,7 @@ from typing import Callable, Mapping, Optional
 
 from ..device import (
     AndroidDevice,
+    AppLaunchError,
     DeviceError,
     ElementTimeoutError,
     StopRequested,
@@ -159,7 +160,13 @@ class SignupFlow:
         self._log.info("启动模拟器（实例 %s）…", self._emulator_num)
         device.start_emulator()
         self._log.info("打开得力E+ …")
-        device.start_app(Package)
+        try:
+            device.start_app(Package, timeout=30)
+        except AppLaunchError as e:
+            # 30 秒没启动成功视为卡死：关闭由本程序启动的模拟器再报错
+            if getattr(device, "started_by_us", False):
+                device.shutdown_instance()
+            raise AppLaunchError(f"{e}（已关闭由本程序启动的模拟器实例）") from e
 
     def _enter_login_page(self, device: AndroidDevice) -> None:
         """处理启动页：关广告、退出已登录账号，直到出现登录按钮。"""
@@ -167,7 +174,10 @@ class SignupFlow:
         while True:
             self._check_stop()
             try:
-                index, element = device.wait_any(LAUNCH_CANDIDATES, timeout=5, poll=0.5)
+                # 轮询窗口跟随剩余预算（避免小预算测试/收尾阶段空转）
+                remaining = max(0.5, min(5.0, deadline - time.monotonic()))
+                index, element = device.wait_any(
+                    LAUNCH_CANDIDATES, timeout=remaining, poll=0.5)
             except ElementTimeoutError:
                 if time.monotonic() > deadline:
                     raise DeviceError(
@@ -187,11 +197,13 @@ class SignupFlow:
 
     def _signup_one(self, device: AndroidDevice, phone: str, password: str) -> None:
         self._check_stop()
+        # 上一账号失败可能停在任意页面：先回到登录页再登录
+        self._enter_login_page(device)
         self._log.info("正在登录 %s", mask_phone(phone))
         device.type_text(PHONE_INPUT, phone)
         device.type_text(PASSWORD_INPUT, password)
         # 登录点击可能被切换动画吞掉：以"同意并继续"出现为准，无效就再点
-        device.click_until(LOGIN_BUTTON, AGREE_BUTTON, schedule=(2.5, 4.0, 6.0))
+        device.click_until(LOGIN_BUTTON, AGREE_BUTTON, schedule=(3.0, 5.0, 6.0))
 
         # 登录后、进入主页前设置虚拟定位，确保考勤页面读到正确位置
         device.set_location(
@@ -233,7 +245,7 @@ class SignupFlow:
             self._log.success("调试模式：已验证到打卡窗口，跳过实际打卡")
             return
 
-        confirm = device.click_until(PUNCH_BUTTON, PUNCH_CONFIRM, schedule=(1.5, 3.0, 5.0))
+        confirm = device.click_until(PUNCH_BUTTON, PUNCH_CONFIRM, schedule=(2.0, 4.0, 6.0))
         confirm.click()
         if not device.wait_gone(PUNCH_CONFIRM, timeout=15):
             raise DeviceError("点击打卡后确认按钮未消失：打卡可能未成功，请人工核对")
@@ -249,7 +261,7 @@ class SignupFlow:
         """
         self._check_stop()
         # 我的 tab -> 出现「设置」入口（点击被吞则重试）
-        device.click_until(MINE_TAB, SETTINGS_ITEM, schedule=(2.5, 4.0))
+        device.click_until(MINE_TAB, SETTINGS_ITEM, schedule=(3.0, 5.0))
         # 进入设置页
         device.click(SETTINGS_ITEM, timeout=8)
         self._reveal_logout(device)
@@ -271,7 +283,7 @@ class SignupFlow:
 
     def _tap_logout_confirmed(self, device: AndroidDevice) -> None:
         # 点击可能被吞：以「确定」弹窗出现为准，没弹就再点
-        device.click_until(LOGOUT_ITEM, CONFIRM_BUTTON, schedule=(1.5, 2.5, 3.5))
+        device.click_until(LOGOUT_ITEM, CONFIRM_BUTTON, schedule=(2.0, 3.0, 4.0))
         device.click(CONFIRM_BUTTON, timeout=6)
         if not device.wait_gone(LOGOUT_ITEM, timeout=10):
             raise DeviceError("确认退出后界面未返回：请人工检查 App 状态")

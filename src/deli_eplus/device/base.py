@@ -12,8 +12,9 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from .exceptions import (
     AppLaunchError,
@@ -77,60 +78,60 @@ class AndroidDevice:
     def connected(self) -> bool:
         return self._u2 is not None
 
-    def connect(self, timeout: float = 90) -> "AndroidDevice":
-        """分三阶段连接设备（每阶段动态轮询、细化日志，杜绝长时间无反馈）：
+    def _bounded(self, fn: Callable[[], Any], timeout: float):
+        """在独立线程跑 fn 并硬限时；adb 偶发卡死也不会拖住轮询。
 
-        1. ADB 设备出现在设备列表（秒级快速探测）
-        2. 模拟器系统启动完成（sys.boot_completed，避免盲目撞 u2 重服务）
-        3. uiautomator 服务可用（u2.connect + info）
+        返回 ("ok", 值) / ("timeout", None) / ("error", 异常)。
+        卡死的探测线程无法终止（daemon 线程随进程退出），但轮询不等它。
+        """
+        result: dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                result["value"] = fn()
+            except Exception as e:  # noqa: BLE001
+                result["error"] = e
+
+        worker = threading.Thread(target=run, daemon=True)
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            return "timeout", None
+        if "error" in result:
+            return "error", result["error"]
+        return "ok", result.get("value")
+
+    def connect(self, timeout: float = 40) -> "AndroidDevice":
+        """连接全部交给 u2.connect（后续命令都基于 u2），看门狗限时循环重试。
+
+        经验值：模拟器启动后 30 秒内应完成连接，超时即视为卡死，
+        尽早报错而不是无限等待。
         """
         deadline = time.monotonic() + timeout
         started = time.monotonic()
-
-        # 阶段 1+2：轻量 adbutils 探测（失败快，轮询密）
-        boot_done = False
-        while not boot_done:
-            self._check_stop()
-            try:
-                import adbutils
-
-                client = adbutils.AdbClient(host="127.0.0.1", port=5037)
-                shell_out = client.device(self.serial).shell(
-                    "getprop sys.boot_completed", timeout=5)
-                if str(shell_out).strip() == "1":
-                    boot_done = True
-                    self._log.info("模拟器系统已就绪（%.1f 秒）",
-                                   time.monotonic() - started)
-                    break
-                self._log.info("等待模拟器系统启动完成…")
-            except Exception:
-                self._log.info("等待 ADB 设备 %s 出现…", self.serial)
-            if time.monotonic() >= deadline:
-                raise DeviceConnectionError(
-                    f"连接设备 {self.serial} 超时（{timeout:g} 秒）：请确认模拟器已运行"
-                )
-            time.sleep(1)
-
-        # 阶段 3：u2 重连接（uiautomator 服务就绪即成功）
         while True:
             self._check_stop()
-            try:
-                import uiautomator2 as u2
-
-                device = u2.connect(self.serial)
-                device.info  # 触碰一次，确认 uiautomator 服务可用
-                self._u2 = device
+            state, value = self._bounded(self._u2_connect, timeout=15)
+            if state == "ok":
+                self._u2 = value
                 self._log.info("ADB 已连接 %s（%.1f 秒）",
                                self.serial, time.monotonic() - started)
                 return self
-            except Exception as e:  # uiautomator 服务未就绪等瞬态错误，快速重试
-                self._log.debug("uiautomator 服务未就绪: %r", e)
-                if time.monotonic() >= deadline:
-                    raise DeviceConnectionError(
-                        f"连接设备 {self.serial} 超时（{timeout:g} 秒）："
-                        f"uiautomator 服务未就绪 · 最后错误: {e!r}"
-                    ) from e
-                time.sleep(0.5)
+            reason = "探测超时" if state == "timeout" else f"未就绪（{value}）"
+            self._log.info("等待 ADB/uiautomator（%s），u2 connect 重试…", reason)
+            if time.monotonic() >= deadline:
+                raise DeviceConnectionError(
+                    f"连接设备 {self.serial} 超时（{timeout:g} 秒）："
+                    f"请确认模拟器已运行且完成启动 · 最后状态: {reason}"
+                )
+            time.sleep(1)
+
+    def _u2_connect(self):
+        import uiautomator2 as u2
+
+        device = u2.connect(self.serial)
+        device.info  # 触碰一次，确认 uiautomator 服务可用
+        return device
 
     def _require_connected(self):
         if self._u2 is None:
@@ -139,7 +140,7 @@ class AndroidDevice:
 
     # ---------- 应用 ----------
 
-    def start_app(self, package: str, timeout: float = 120) -> None:
+    def start_app(self, package: str, timeout: float = 30) -> None:
         """启动应用并确认到达前台；未安装等永久性错误立即失败，瞬态错误重试。"""
         device = self._require_connected()
         from uiautomator2.exceptions import AppNotFoundError
@@ -242,23 +243,36 @@ class AndroidDevice:
 
     def click_until(self, selector: Selector, until_selector: Selector, *,
                     schedule: tuple[float, ...] = (2.0, 3.0, 4.0)) -> Element:
-        """点击 selector 并等待 until_selector 出现；未出现视为点击未生效，重试。
+        """点击 selector 并等待 until_selector 出现；未出现再点一遍。
 
-        App 在页面切换动画期间的点击/滑动可能被静默丢弃。等待用递增调度：
-        点击生效时立即返回，不生效时按 schedule 逐轮加长等待后再重试，
-        不做任何固定 sleep。
+        每轮 = 点击一次 -> 在预算内轮询 until：
+        - until 出现：立即返回（预算只是上限，成功路径不等待）
+        - 预算耗尽：进入下一轮（重新 find 源并点击）
+        页面切换动画期间点击可能被静默丢弃，靠多轮覆盖。
         """
         last_error: Optional[Exception] = None
         for wait in schedule:
-            self.click(selector, timeout=6)
             try:
-                return self.find(until_selector, timeout=wait, poll=0.3)
+                element = self.find(selector, timeout=6)
             except ElementTimeoutError as e:
                 last_error = e
-                self._log.warning("点击 %s 后 %.1fs 内未出现 %s，重试",
-                                  selector, wait, until_selector)
+                continue
+            element.click()
+            self._log.debug("点击: %s", selector)
+            sub_end = time.monotonic() + wait
+            while True:
+                self._check_stop()
+                try:
+                    if self.exists(until_selector):
+                        return self.find(until_selector, timeout=1)
+                except Exception as e:  # dump 瞬断
+                    last_error = e
+                if time.monotonic() >= sub_end:
+                    break
+                time.sleep(0.3)
+            last_error = ElementTimeoutError([until_selector], wait)
         raise DeviceError(
-            f"点击 {selector} 后未出现 {until_selector}（重试 {len(schedule)} 次无效）"
+            f"点击 {selector} 后 {sum(schedule):g} 秒内未出现 {until_selector}"
         ) from last_error
 
     def wait_ui_stable(self, timeout: float = 3.0, interval: float = 0.25) -> None:

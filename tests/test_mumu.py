@@ -43,12 +43,20 @@ def test_start_emulator_missing_exe_clear_error(tmp_path):
 
 def test_start_emulator_launches_process_and_connects(device, mumu_dir, monkeypatch):
 
+    def fake_popen(cmd, cwd=None, **kwargs):
+        launched["cmd"] = cmd
+        return "proc"
+
+    launched = {}
+    monkeypatch.setattr("deli_eplus.device.mumu.subprocess.Popen", fake_popen)
     monkeypatch.setattr("deli_eplus.device.mumu.subprocess.run",
                         lambda cmd, **kw: types.SimpleNamespace(
                             stdout=b'{"is_process_started": false, "is_android_started": true}',
                             stderr=b""))
     monkeypatch.setattr(device, "connect", lambda timeout=180: None)
     device.start_emulator(timeout=1)
+    assert launched["cmd"][0].endswith("MuMuManager.exe")
+    assert "launch" in launched["cmd"]
     assert device.started_by_us is True  # info: 进程未运行 → 由本程序拉起
 
 
@@ -107,6 +115,13 @@ def test_set_location_timeout(device, monkeypatch):
     monkeypatch.setattr("deli_eplus.device.mumu.subprocess.run", fake_run)
     with pytest.raises(LocationError):
         device.set_location(1.0, 2.0)
+
+
+def test_parse_json_object_multiline():
+    """MuMuManager info 是多行美化 JSON，必须整段解析。"""
+    multiline = '{\n  "adb_port": 16384,\n  "is_android_started": true\n}'
+    data = MuMuDevice._parse_json_object(multiline)
+    assert data == {"adb_port": 16384, "is_android_started": True}
 
 
 def test_parse_manager_output_variants():

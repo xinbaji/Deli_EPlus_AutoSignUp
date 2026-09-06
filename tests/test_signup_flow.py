@@ -268,6 +268,7 @@ def test_account_failure_continues_to_next_account(monkeypatch):
         ("click", AGREE_BUTTON): goto(ATTENDANCE_ENTRY),
     }
     users = {"13800001111": "pw", "13800002222": "pw"}
+    monkeypatch.setattr(signup, "ENTER_LOGIN_TIMEOUT", 1)
     _, flow, account_events, _ = make_flow(
         monkeypatch, set(LOGIN_PAGE), transitions, users=users,
         patch_punch_timeout=False,
