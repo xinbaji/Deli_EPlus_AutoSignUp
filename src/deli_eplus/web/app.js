@@ -185,6 +185,28 @@ const FEED_ICON = {
   info: "bi-arrow-right-short",
 };
 
+function appendWaitLine(key, message) {
+  const feed = $("feed");
+  if (feed.querySelector(".empty-mini")) feed.innerHTML = "";
+  let line = feed.querySelector(`[data-wait="${CSS.escape(key)}"]`);
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "feed-line warning wait";
+    line.dataset.wait = key;
+    line.innerHTML = `<i class="bi ${FEED_ICON.warning}"></i><span class="ts"></span><span class="msg"></span>`;
+    feed.appendChild(line);
+  }
+  const ts = message.slice(0, 8);
+  const body = message.includes("  ") ? message.slice(message.indexOf("  ") + 2) : message;
+  const msgSpan = line.querySelector(".msg");
+  if (msgSpan.dataset.raw !== body) {   // 内容没变就不重写，避免闪烁
+    msgSpan.dataset.raw = body;
+    msgSpan.textContent = body;
+    line.querySelector(".ts").textContent = ts;
+    if (state.feedFollow) feed.scrollTop = feed.scrollHeight;
+  }
+}
+
 function appendFeed(message, level) {
   const feed = $("feed");
   if (feed.querySelector(".empty-mini")) feed.innerHTML = "";
@@ -387,11 +409,6 @@ function bindSettings() {
       clearTimeout(locSaveTimer);
       locSaveTimer = setTimeout(autoSaveLocation, 700);
     }));
-  $("btn-test-loc").addEventListener("click", async () => {
-    setResult("loc-result", null, "测试中…");
-    const res = await window.pywebview.api.test_location($("set-lat").value, $("set-lon").value);
-    if (!res.ok) setResult("loc-result", false, res.error);
-  });
   $("btn-debug").addEventListener("click", () => startSignup(true));
 
   bindSwitch("sw-autoupdate", "set_auto_update");
@@ -581,6 +598,9 @@ window.__pushEvent = function (ev) {
       break;
     case "feed":
       (d.items || []).forEach((it) => appendFeed(it.message, it.level));
+      break;
+    case "feed_wait":
+      appendWaitLine(d.key, d.message);
       break;
     case "detect":
       setResult(d.target === "loc" ? "loc-result" : "emu-result", d.ok, d.message);

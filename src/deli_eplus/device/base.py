@@ -118,7 +118,8 @@ class AndroidDevice:
                                self.serial, time.monotonic() - started)
                 return self
             reason = "探测超时" if state == "timeout" else f"未就绪（{value}）"
-            self._log.info("等待 ADB/uiautomator（%s），u2 connect 重试…", reason)
+            self._log.info("等待 ADB/uiautomator（%.0fs，%s）",
+                           time.monotonic() - started, reason)
             if time.monotonic() >= deadline:
                 raise DeviceConnectionError(
                     f"连接设备 {self.serial} 超时（{timeout:g} 秒）："

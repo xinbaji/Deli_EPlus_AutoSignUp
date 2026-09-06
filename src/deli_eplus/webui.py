@@ -33,6 +33,13 @@ CLOSE_TIMEOUT = 10.0
 FEED_POLL = 0.15
 
 
+def _wait_key(message: str) -> str:
+    """等待类消息的稳定 key：去掉数字与括号内容，同族消息共用一行。"""
+    import re as _re
+
+    return _re.sub(r"[（(].*?[)）]|\d+", "", message).strip()[:40]
+
+
 def web_dir() -> Path:
     """前端资源目录：打包后在 _MEIPASS/deli_eplus/web，开发期在包目录下。"""
     meipass = getattr(__import__("sys"), "_MEIPASS", None)

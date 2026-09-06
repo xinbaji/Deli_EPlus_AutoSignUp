@@ -7,7 +7,7 @@
 - 旧 spec 曾把源码 .py 再塞一份 datas，纯属重复，已去掉；
 - 字体资源放 assets/fonts，运行时经 sys._MEIPASS 读取。
 """
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 import os
 
 # spec 内的相对路径以 spec 文件所在目录为基准
@@ -16,6 +16,10 @@ ASSETS = os.path.join(ROOT, "assets")
 
 datas = [
     (os.path.join(ROOT, "src", "deli_eplus", "web"), "deli_eplus/web"),
+    (os.path.join(ASSETS, "app.ico"), "assets"),
+    # u2.jar / app-uiautomator.apk：u2 连接设备必须推送的资产
+    # （缺失时 u2.connect 报 "Resource assets/u2.jar not found"，连接永远失败）
+    *collect_data_files("uiautomator2"),
 ]
 
 hiddenimports = (
@@ -62,6 +66,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    icon=os.path.join(ASSETS, "app.ico"),
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
