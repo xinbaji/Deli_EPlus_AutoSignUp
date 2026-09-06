@@ -110,6 +110,14 @@
       <div class="card">
         <div class="card-title"><i class="bi bi-toggles card-ic"></i>通用</div>
         <div class="set-row">
+          <i class="bi bi-arrow-repeat set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">自动更新</div>
+            <div class="set-desc">每次启动自动检查并下载更新，完成后提示重启</div>
+          </div>
+          <button class="switch" id="sw-autoupdate" aria-label="自动更新"></button>
+        </div>
+        <div class="set-row">
           <i class="bi bi-lightning-charge-fill set-ic"></i>
           <div class="set-text">
             <div class="set-name">开机自启</div>
@@ -189,8 +197,10 @@
         <div class="about-row">
           <span class="about-k">应用</span><span id="about-app"></span>
           <span class="spacer"></span>
-          <span class="caption" id="update-state"></span>
-          <button class="btn accent small" id="btn-update" hidden>立即更新</button>
+          <span class="caption" id="update-state">已是最新版本</span>
+          <button class="btn subtle small" id="btn-detect">检测更新</button>
+          <button class="btn accent small" id="btn-download" hidden>下载更新</button>
+          <button class="btn accent small" id="btn-restart-update" hidden>重启更新</button>
         </div>
         <div class="update-progress" id="update-progress" hidden>
           <div class="bar"><div class="fill" id="update-bar"></div></div>

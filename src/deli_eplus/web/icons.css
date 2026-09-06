@@ -36,3 +36,4 @@
 .bi-arrow-right-short::before { content: '\F135'; }
 .bi-hourglass-split::before { content: '\F41F'; }
 .bi-search::before { content: '\F52A'; }
+.bi-arrow-repeat::before { content: '\F130'; }

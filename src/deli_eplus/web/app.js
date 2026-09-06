@@ -394,10 +394,24 @@ function bindSettings() {
   });
   $("btn-debug").addEventListener("click", () => startSignup(true));
 
+  bindSwitch("sw-autoupdate", "set_auto_update");
   bindSwitch("sw-autostart", "set_autostart");
   bindSwitch("sw-close-emu", "set_close_emulator_after");
 
-  $("btn-update").addEventListener("click", startUpdateDownload);
+  $("btn-detect").addEventListener("click", async () => {
+    setUpdateButtons("none");
+    setUpdateState("检测中…");
+    try {
+      const res = await window.pywebview.api.check_update();
+      applyUpdateCheck(res, false);
+    } catch (e) { setUpdateState("检查更新失败"); }
+  });
+  $("btn-download").addEventListener("click", startUpdateDownload);
+  $("btn-restart-update").addEventListener("click", async () => {
+    setUpdateButtons("none");
+    setUpdateState("正在更新，程序将自动重启…");
+    await window.pywebview.api.apply_update();
+  });
   document.querySelectorAll(".pill-btn[data-src]").forEach((b) =>
     b.addEventListener("click", async () => {
       const res = await window.pywebview.api.set_update_source(b.dataset.src);
@@ -495,23 +509,31 @@ function markUpdateSource(source) {
     b.classList.toggle("active", b.dataset.src === source));
 }
 
-function setUpdateState(text, showButton) {
-  $("update-state").textContent = text || "";
-  $("btn-update").hidden = !showButton;
+function setUpdateState(text) {
+  $("update-state").textContent = text;
 }
 
-function applyUpdateCheck(res) {
-  if (!res.ok) { setUpdateState("检查更新失败"); return; }
-  if (res.status === "latest") setUpdateState("已是最新版本", false);
-  else setUpdateState(`发现新版本 v${res.tag}`, true);
+function setUpdateButtons(which) {
+  $("btn-detect").hidden = which !== "detect";
+  $("btn-download").hidden = which !== "download";
+  $("btn-restart-update").hidden = which !== "restart";
 }
 
-let updating = false;
+function applyUpdateCheck(res, auto) {
+  if (!res.ok) { setUpdateState(res.error || "检查更新失败"); setUpdateButtons("detect"); return; }
+  if (res.status === "latest") { setUpdateState("已是最新版本"); setUpdateButtons("detect"); return; }
+  setUpdateState(`检测到新版本 v${res.tag}`);
+  if (auto) { startUpdateDownload(); return; }
+  setUpdateButtons("download");
+}
+
+const UPD = { downloading: false };
+
 function startUpdateDownload() {
-  if (updating) return;
-  updating = true;
-  $("btn-update").disabled = true;
-  setUpdateState("准备下载…", false);
+  if (UPD.downloading) return;
+  UPD.downloading = true;
+  setUpdateButtons("none");
+  setUpdateState("下载中…");
   $("update-progress").hidden = false;
   $("update-bar").style.width = "0%";
   $("update-percent").textContent = "";
@@ -525,28 +547,22 @@ function onUpdateEvent(d) {
       $("update-percent").textContent = d.percent + "%";
       break;
     case "downloaded":
-      updating = false;
+      UPD.downloading = false;
+      $("update-progress").hidden = true;
       $("update-percent").textContent = "100%";
-      setUpdateState("下载完成", false);
-      $("btn-update").textContent = "重启并更新";
-      $("btn-update").disabled = false;
-      $("btn-update").hidden = false;
-      $("btn-update").onclick = async () => {
-        $("btn-update").disabled = true;
-        setUpdateState("正在更新，程序将自动重启…", false);
-        await window.pywebview.api.apply_update();
-      };
+      setUpdateState("下载完成");
+      setUpdateButtons("restart");
       break;
     case "error":
-      updating = false;
-      $("btn-update").disabled = false;
-      setUpdateState(d.message || "更新失败", true);
+      UPD.downloading = false;
       $("update-progress").hidden = true;
+      setUpdateState(d.message || "更新失败");
+      setUpdateButtons("detect");
       break;
     case "latest":
-      updating = false;
-      setUpdateState("已是最新版本", false);
-      $("update-progress").hidden = true;
+      UPD.downloading = false;
+      setUpdateState("已是最新版本");
+      setUpdateButtons("detect");
       break;
   }
 }

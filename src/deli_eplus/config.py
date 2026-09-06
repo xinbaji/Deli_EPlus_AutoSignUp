@@ -27,6 +27,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "theme": "light",
     "download_source": "mirror",
     "close_emulator_after": False,
+    "auto_update": True,
     "emulator_path": "",
     "emulator_num": "0",
     "location": {"latitude": 45.0, "longitude": 45.0},
@@ -72,6 +73,7 @@ def normalize(raw: Any) -> dict[str, Any]:
     data["download_source"] = ("github" if raw.get("download_source") == "github"
                                else "mirror")
     data["close_emulator_after"] = bool(raw.get("close_emulator_after", False))
+    data["auto_update"] = bool(raw.get("auto_update", True))
 
     loc = raw.get("location")
     if isinstance(loc, dict):
@@ -167,6 +169,10 @@ class Config:
         return self._data["close_emulator_after"]
 
     @property
+    def auto_update(self) -> bool:
+        return self._data["auto_update"]
+
+    @property
     def users(self) -> dict[str, str]:
         return dict(self._data["users"])
 
@@ -203,6 +209,11 @@ class Config:
     def set_close_emulator_after(self, enabled: bool) -> None:
         with self._lock:
             self._data["close_emulator_after"] = bool(enabled)
+        self.save()
+
+    def set_auto_update(self, enabled: bool) -> None:
+        with self._lock:
+            self._data["auto_update"] = bool(enabled)
         self.save()
 
     def set_users(self, users: dict[str, str]) -> None:

@@ -92,6 +92,7 @@ class Api:
             "theme": self._cfg.theme,
             "download_source": self._cfg.download_source,
             "close_emulator_after": self._cfg.close_emulator_after,
+            "auto_update": self._cfg.auto_update,
             "autostart": self._autostart_enabled(),
             **self._brief(),
         }
@@ -216,6 +217,10 @@ class Api:
         self._cfg.set_close_emulator_after(bool(enabled))
         return {"ok": True}
 
+    def set_auto_update(self, enabled: bool) -> dict[str, Any]:
+        self._cfg.set_auto_update(bool(enabled))
+        return {"ok": True}
+
     # ---------- 自动更新 ----------
 
     def _update_source(self) -> str:
@@ -245,16 +250,6 @@ class Api:
             "tag": info["tag"],
             "notes": info["notes"],
         }
-
-    def auto_check_update(self) -> None:
-        """启动后台线程检查更新，有新版以事件推给前端。"""
-
-        def work() -> None:
-            result = self.check_update()
-            if result.get("ok") and result.get("status") == "available":
-                self._push("update", {"status": "available", "tag": result["tag"]})
-
-        threading.Thread(target=work, daemon=True, name="update-check").start()
 
     def download_update(self) -> dict[str, Any]:
         from .config import base_dir
@@ -419,9 +414,24 @@ class _StopToken:
 
 def run_app() -> int:
     import ctypes
+    import sys as _sys
 
     setup_log()
     log = get_logger("webui")
+
+    # 关闭前已下载的更新包：本次启动先应用更新再进主界面
+    try:
+        from . import updater
+        from .config import base_dir
+
+        pending = base_dir() / "update" / updater.ASSET_NAME
+        if getattr(_sys, "frozen", False) and pending.is_file():
+            log.info("检测到已下载的更新包，先应用更新再启动…")
+            updater.apply_update(pending, base_dir(),
+                                 Path(_sys.executable).name)
+            return 0
+    except Exception as e:
+        log.warning("应用更新包失败（忽略，正常启动）: %s", e)
 
     # 单例化：命名互斥量，重复启动直接提示退出
     _mutex = ctypes.windll.kernel32.CreateMutexW(
@@ -477,7 +487,6 @@ def run_app() -> int:
 
     window.events.closed += on_closed
     threading.Thread(target=feed_poller, daemon=True, name="feed-poller").start()
-    api.auto_check_update()
     log.info("界面启动（v%s）", VERSION)
     webview.start()
     return 0
