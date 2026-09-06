@@ -91,6 +91,8 @@ class Api:
                     "author": AUTHOR, "repo": REPO_URL},
             "theme": self._cfg.theme,
             "download_source": self._cfg.download_source,
+            "close_emulator_after": self._cfg.close_emulator_after,
+            "autostart": self._autostart_enabled(),
             **self._brief(),
         }
 
@@ -190,6 +192,29 @@ class Api:
 
     def open_repo(self) -> None:
         webbrowser.open(REPO_URL)
+
+    # ---------- 通用开关 ----------
+
+    def _autostart_enabled(self) -> bool:
+        from . import autostart
+
+        try:
+            return autostart.is_enabled()
+        except Exception:
+            return False
+
+    def set_autostart(self, enabled: bool) -> dict[str, Any]:
+        from . import autostart
+
+        try:
+            autostart.set_enabled(bool(enabled))
+        except Exception as e:
+            return self._err(e)
+        return {"ok": True, "enabled": bool(enabled)}
+
+    def set_close_emulator_after(self, enabled: bool) -> dict[str, Any]:
+        self._cfg.set_close_emulator_after(bool(enabled))
+        return {"ok": True}
 
     # ---------- 自动更新 ----------
 
@@ -359,6 +384,7 @@ class Api:
                     users=self._cfg.users,
                     location=self._cfg.location,
                     debug=debug_flag,
+                    close_emulator_after=self._cfg.close_emulator_after,
                     on_account=on_account,
                     on_run=on_run,
                     stop_check=self._stop_token.stopped,
@@ -392,8 +418,22 @@ class _StopToken:
 
 
 def run_app() -> int:
+    import ctypes
+
     setup_log()
     log = get_logger("webui")
+
+    # 单例化：命名互斥量，重复启动直接提示退出
+    _mutex = ctypes.windll.kernel32.CreateMutexW(
+        None, False, r"Local\DeliEPlus_AutoSignUp_SingleInstance")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        log.warning("已有实例在运行，拒绝重复启动")
+        ctypes.windll.user32.MessageBoxW(
+            None, "得力E+ 自动签到已在运行中，请勿重复启动。",
+            APP_NAME, 0x40)
+        return 1
+    _ = _mutex  # 句柄保持打开直到进程退出（互斥量即存活）
+
     config = Config()
     api = Api(config)
 

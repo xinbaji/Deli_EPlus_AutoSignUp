@@ -75,6 +75,7 @@ class SignupFlow:
         users: Mapping[str, str],
         location: Mapping[str, float],
         debug: bool = False,
+        close_emulator_after: bool = False,
         on_account: Optional[Callable[[str, str, str], None]] = None,
         on_run: Optional[Callable[[str, str], None]] = None,
         stop_check: Optional[Callable[[], bool]] = None,
@@ -85,6 +86,7 @@ class SignupFlow:
         self._users = dict(users)
         self._location = dict(location)
         self._debug = debug
+        self._close_emulator_after = close_emulator_after
         self._on_account = on_account or (lambda *a: None)
         self._on_run = on_run or (lambda *a: None)
         self._stop_check = stop_check or (lambda: False)
@@ -128,6 +130,13 @@ class SignupFlow:
                 self._emit_run("finished", f"本轮结束：{total - failed}/{total} 成功，{failed} 失败")
                 return False
             self._emit_run("finished", f"本轮结束：{total}/{total} 全部成功")
+            # 开关开启且模拟器由本程序启动时，签到完成后顺手关闭实例
+            if self._close_emulator_after and self.device is not None:
+                if getattr(self.device, "started_by_us", False):
+                    self._log.info("关闭由本程序启动的模拟器实例…")
+                    shutdown = getattr(self.device, "shutdown_instance", None)
+                    if shutdown:
+                        shutdown()
             return True
 
         except StopRequested:

@@ -15,7 +15,7 @@ ICONS = [
     "moon-stars", "sun", "play-fill", "stop-fill", "folder2-open",
     "clock-history", "exclamation-triangle-fill", "box-arrow-up",
     "box-arrow-down", "plus-lg", "eye", "eye-slash", "pencil", "trash3",
-    "sliders", "pc-display", "geo-alt", "bug-fill", "info-circle",
+    "sliders", "pc-display", "geo-alt", "bug-fill", "info-circle", "toggles",
     "check-circle-fill", "x-circle-fill", "arrow-right-short",
     "hourglass-split", "search",
 ]

@@ -374,3 +374,36 @@ def test_login_click_lost_then_retry(monkeypatch):
     assert flow.run() is True
     login_clicks = [c for c in device.calls if c == ("click", LOGIN_BUTTON)]
     assert len(login_clicks) >= 2
+
+def test_close_emulator_after_signup_when_started_by_us(monkeypatch):
+    """开关开启且模拟器由本程序启动 → 完成后自动关闭实例。"""
+    device = ScriptedDevice(set(LOGIN_PAGE), punch_transitions())
+    device.started_by_us = True
+    shutdown_calls = []
+    device.shutdown_instance = lambda timeout=20: shutdown_calls.append(1)
+    flow = SignupFlow(
+        serial="s", emulator_path="C:/MuMu", emulator_num="0",
+        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
+        close_emulator_after=True,
+        on_account=lambda *a: None, on_run=lambda *a: None,
+    )
+    monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
+    assert flow.run() is True
+    assert len(shutdown_calls) == 1
+
+
+def test_no_close_when_switch_off(monkeypatch):
+    device = ScriptedDevice(set(LOGIN_PAGE), punch_transitions())
+    device.started_by_us = True
+    shutdown_calls = []
+    device.shutdown_instance = lambda timeout=20: shutdown_calls.append(1)
+    flow = SignupFlow(
+        serial="s", emulator_path="C:/MuMu", emulator_num="0",
+        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
+        close_emulator_after=False,
+        on_account=lambda *a: None, on_run=lambda *a: None,
+    )
+    monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
+    assert flow.run() is True
+    assert shutdown_calls == []
+

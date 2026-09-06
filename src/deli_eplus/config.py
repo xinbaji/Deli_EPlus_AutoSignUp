@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG: dict[str, Any] = {
     "serial": "127.0.0.1:16384",
     "theme": "light",
-    "download_source": "github",
+    "download_source": "mirror",
+    "close_emulator_after": False,
     "emulator_path": "",
     "emulator_num": "0",
     "location": {"latitude": 45.0, "longitude": 45.0},
@@ -68,8 +69,9 @@ def normalize(raw: Any) -> dict[str, Any]:
     data["emulator_path"] = str(raw.get("emulator_path") or "").strip()
     data["emulator_num"] = str(raw.get("emulator_num", data["emulator_num"])).strip() or "0"
     data["theme"] = "dark" if raw.get("theme") == "dark" else "light"
-    data["download_source"] = ("mirror" if raw.get("download_source") == "mirror"
-                               else "github")
+    data["download_source"] = ("github" if raw.get("download_source") == "github"
+                               else "mirror")
+    data["close_emulator_after"] = bool(raw.get("close_emulator_after", False))
 
     loc = raw.get("location")
     if isinstance(loc, dict):
@@ -161,6 +163,10 @@ class Config:
         return self._data["download_source"]
 
     @property
+    def close_emulator_after(self) -> bool:
+        return self._data["close_emulator_after"]
+
+    @property
     def users(self) -> dict[str, str]:
         return dict(self._data["users"])
 
@@ -192,6 +198,11 @@ class Config:
             raise ConfigError("下载源只能是 github 或 mirror")
         with self._lock:
             self._data["download_source"] = source
+        self.save()
+
+    def set_close_emulator_after(self, enabled: bool) -> None:
+        with self._lock:
+            self._data["close_emulator_after"] = bool(enabled)
         self.save()
 
     def set_users(self, users: dict[str, str]) -> None:

@@ -30,6 +30,7 @@
 .bi-geo-alt::before { content: '\F3E8'; }
 .bi-bug-fill::before { content: '\F1DB'; }
 .bi-info-circle::before { content: '\F431'; }
+.bi-toggles::before { content: '\F5D9'; }
 .bi-check-circle-fill::before { content: '\F26A'; }
 .bi-x-circle-fill::before { content: '\F622'; }
 .bi-arrow-right-short::before { content: '\F135'; }

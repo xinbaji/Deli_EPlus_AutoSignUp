@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import types
 
 import pytest
 
@@ -41,20 +42,14 @@ def test_start_emulator_missing_exe_clear_error(tmp_path):
 
 
 def test_start_emulator_launches_process_and_connects(device, mumu_dir, monkeypatch):
-    launched = {}
 
-    def fake_popen(cmd, cwd=None, **kwargs):
-        launched["cmd"] = cmd
-        launched["cwd"] = cwd
-        return object()
-
-    monkeypatch.setattr("deli_eplus.device.mumu.subprocess.Popen", fake_popen)
-    monkeypatch.setattr(device, "_emu_process_running", lambda: False)
-    device._u2 = object()  # connect 打桩：直接标记已连
+    monkeypatch.setattr("deli_eplus.device.mumu.subprocess.run",
+                        lambda cmd, **kw: types.SimpleNamespace(
+                            stdout=b'{"is_process_started": false, "is_android_started": true}',
+                            stderr=b""))
     monkeypatch.setattr(device, "connect", lambda timeout=180: None)
     device.start_emulator(timeout=1)
-    assert launched["cmd"][0].endswith("MuMuNxMain.exe")
-    assert "-v" in launched["cmd"]
+    assert device.started_by_us is True  # info: 进程未运行 → 由本程序拉起
 
 
 def test_set_location_success_json(device, monkeypatch):

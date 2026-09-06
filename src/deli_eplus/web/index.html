@@ -108,6 +108,26 @@
       <header class="page-header"><h1>设置</h1></header>
 
       <div class="card">
+        <div class="card-title"><i class="bi bi-toggles card-ic"></i>通用</div>
+        <div class="set-row">
+          <i class="bi bi-lightning-charge-fill set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">开机自启</div>
+            <div class="set-desc">登录 Windows 后自动启动本程序</div>
+          </div>
+          <button class="switch" id="sw-autostart" aria-label="开机自启"></button>
+        </div>
+        <div class="set-row">
+          <i class="bi bi-stop-fill set-ic"></i>
+          <div class="set-text">
+            <div class="set-name">签到完成后关闭模拟器</div>
+            <div class="set-desc">仅当模拟器由本程序启动时才会关闭</div>
+          </div>
+          <button class="switch" id="sw-close-emu" aria-label="签到完成后关闭模拟器"></button>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title"><i class="bi bi-sliders card-ic"></i>模拟器</div>
         <div class="set-row">
           <i class="bi bi-pc-display set-ic"></i>

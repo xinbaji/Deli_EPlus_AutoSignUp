@@ -394,6 +394,9 @@ function bindSettings() {
   });
   $("btn-debug").addEventListener("click", () => startSignup(true));
 
+  bindSwitch("sw-autostart", "set_autostart");
+  bindSwitch("sw-close-emu", "set_close_emulator_after");
+
   $("btn-update").addEventListener("click", startUpdateDownload);
   document.querySelectorAll(".pill-btn[data-src]").forEach((b) =>
     b.addEventListener("click", async () => {
@@ -468,6 +471,21 @@ function setResult(id, ok, text) {
   const el = $(id);
   el.textContent = text;
   el.className = "caption result " + (ok === true ? "ok" : ok === false ? "bad" : "");
+}
+
+/* ============ 通用开关 ============ */
+
+function markSwitch(el, on) { el.classList.toggle("on", !!on); }
+
+function bindSwitch(id, apiMethod) {
+  $(id).addEventListener("click", async () => {
+    const enable = !$(id).classList.contains("on");
+    try {
+      const res = await window.pywebview.api[apiMethod](enable);
+      if (!res.ok) { toast(res.error || "设置失败", "bad"); return; }
+      markSwitch($(id), enable);
+    } catch (e) { toast("设置失败：" + e, "bad"); }
+  });
 }
 
 /* ============ 自动更新 ============ */

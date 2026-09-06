@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import subprocess
-from pathlib import Path
+import time
 from typing import Optional
+from pathlib import Path
 
 from .base import AndroidDevice
 from .exceptions import DeviceError, LocationError
@@ -36,40 +37,68 @@ class MuMuDevice(AndroidDevice):
 
     # ---------- 模拟器进程 ----------
 
-    def _emu_process_running(self) -> bool:
-        """MuMu 主进程是否已在运行（运行中则退出时不代关）。"""
-        try:
-            out = subprocess.run(
-                ["tasklist", "/FI", f"IMAGENAME eq {MAIN_NAME}"],
-                capture_output=True, timeout=10,
-            ).stdout.decode("gbk", errors="ignore").lower()
-            return "mumunxmain" in out
-        except (OSError, subprocess.TimeoutExpired, ValueError):
-            return False
 
-    def start_emulator(self, timeout: float = 180) -> None:
-        """启动 MuMu 实例并阻塞等待 ADB 可连接（不再"火后不管"）。"""
+    def _manager(self, args: list[str], timeout: float = 30) -> str:
+        """执行 MuMuManager 子命令，返回合并输出（GBK 解码）。"""
+        result = subprocess.run(
+            [str(self.manager_exe), *args],
+            capture_output=True, timeout=timeout,
+        )
+        stdout = (result.stdout or b"").decode("gbk", errors="ignore")
+        stderr = (result.stderr or b"").decode("gbk", errors="ignore")
+        return stdout + stderr
+
+    def get_instance_info(self) -> Optional[dict]:
+        """官方 `info -v <index>`：实例信息 JSON（含 is_android_started 等）。"""
+        return self._parse_json_object(
+            self._manager(["info", "-v", self.instance]))
+
+    def launch_instance(self) -> None:
+        """官方 `control -v <index> launch`：启动实例（已在运行时安全）。"""
+        self._manager(["control", "-v", self.instance, "launch"], timeout=60)
+
+    def start_emulator(self, timeout: float = 240) -> None:
+        """启动 MuMu 实例并动态等待安卓完全就绪（官方 info 字段驱动）。
+
+        等待链：control launch（重复调用安全）→ info.is_android_started
+        → ADB/uiautomator 连接。每一步都有进度日志，无固定 sleep。
+        """
         self._check_stop()
         for exe in (self.emulator_exe, self.manager_exe):
             if not exe.is_file():
                 raise DeviceError(
                     f"未找到 {exe.name}，请检查设置中的模拟器路径：{self.emulator_path}"
                 )
-        self.started_by_us = not self._emu_process_running()
-        try:
-            subprocess.Popen(
-                [str(self.emulator_exe), "-v", self.instance],
-                cwd=str(self.emulator_path),
-            )
-        except OSError as e:
-            raise DeviceError(f"启动模拟器进程失败: {e}") from e
+        started_at = time.monotonic()
+        info = self.get_instance_info() or {}
+        self.started_by_us = not info.get("is_process_started", False)
 
-        self._log.info("模拟器启动命令已发出（实例 %s），等待 ADB 连接…", self.instance)
+        self._log.info("启动模拟器（官方 control launch，实例 %s）…", self.instance)
+        self.launch_instance()
+
+        # 动态等待安卓启动完成（官方字段 is_android_started）
+        deadline = started_at + timeout
+        while True:
+            self._check_stop()
+            info = self.get_instance_info()
+            if info and info.get("is_android_started"):
+                self._log.info("模拟器安卓已启动（%.1f 秒）",
+                               time.monotonic() - started_at)
+                break
+            if time.monotonic() >= deadline:
+                raise DeviceError(
+                    f"模拟器 {timeout:g} 秒内未完成安卓启动：请确认 MuMu 能正常打开"
+                )
+            state = str(info.get("player_state") or "启动中") if info else "等待信息"
+            self._log.info("等待模拟器安卓启动…（%.0fs，状态: %s）",
+                           time.monotonic() - started_at, state)
+            time.sleep(2)
+
         try:
-            self.connect(timeout=timeout)
+            self.connect(timeout=max(30, deadline - time.monotonic()))
         except DeviceError as e:
             raise DeviceError(
-                f"模拟器启动后 {timeout:g} 秒内仍无法连接：请确认 MuMu 能正常打开"
+                f"模拟器已启动但 ADB 连接失败：{e}"
             ) from e
 
     def shutdown_instance(self, timeout: float = 20) -> None:
@@ -136,6 +165,21 @@ class MuMuDevice(AndroidDevice):
         raise LocationError(
             f"设置虚拟位置失败: {payload.get('msg') or output.strip()[:200]}"
         )
+
+    @staticmethod
+    def _parse_json_object(text: str) -> Optional[dict]:
+        """从输出里解析第一个 JSON 对象（逐行尝试）。"""
+        for line in text.splitlines():
+            line = line.strip()
+            if "{" not in line:
+                continue
+            try:
+                data = json.loads(line[line.index("{"): line.rindex("}") + 1])
+            except (ValueError, IndexError):
+                continue
+            if isinstance(data, dict):
+                return data
+        return None
 
     @staticmethod
     def _parse_manager_output(text: str) -> Optional[dict]:
