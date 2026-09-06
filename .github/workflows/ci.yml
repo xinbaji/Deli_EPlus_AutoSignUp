@@ -1,0 +1,43 @@
+name: CI Tests
+
+# 每次 push / PR 自动跑离线测试（全部用假设备，无需模拟器）。
+# 依赖真机的测试在 tests_local/，不在 CI 收集范围，请本地跑 script/test_local.bat。
+on:
+  push:
+    branches:
+      - "**"        # 所有分支的 push；标签走 release.yml，不重复跑
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # 测试里有 Windows 注册表用例（autostart），且 pywebview 仅免装依赖于 Windows
+    runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        shell: pwsh
+        run: python -m pytest -v --tb=short

@@ -27,8 +27,12 @@
 python -m venv .venv
 .venv/Scripts/pip install -e ".[dev]"
 
-# 2. 运行测试（全部用假设备，无需模拟器）
+# 2. 运行测试（全部用假设备，无需模拟器；CI 同款）
 .venv/Scripts/pytest
+
+# 2b. 本地真机测试（连真实 MuMu，模拟器没开会自动拉起）
+#     覆盖 CI 测不了的部分：启动实例 / ADB 连接 / UI dump / App 启动
+script\test_local.bat                    # 或 .venv/Scripts/pytest tests_local -v
 
 # 3. 启动 GUI / CLI
 .venv/Scripts/python -m deli_eplus.gui
@@ -52,10 +56,14 @@ python -m venv .venv
 │   ├── core/signup.py           唯一签到流程（GUI 与 CLI 共用）
 │   ├── webui.py                 pywebview 窗口 + JS API 桥 + 事件推送
 │   └── web/                     前端（Fluent 2 设计语言，纯 HTML/CSS/JS，零构建步骤）
-├── tests/                       pytest 测试（ScriptedDevice / FakeU2，秒级跑完）
+├── tests/                       pytest 测试（ScriptedDevice / FakeU2，秒级跑完，CI 自动跑）
+├── tests_local/                 本地真机测试（连真实 MuMu，CI 不收集，script/test_local.bat 跑）
 ├── tools/                       dump_ui.py 排查选择器；gen_icons_css.py 生成图标样式
 ├── scripts/                     打包：spec + build.py + installer.iss
 └── assets/fonts/                Bootstrap Icons 字体源（生成 web/fonts 的图标样式）
+
+CI：push / PR 自动跑 `.github/workflows/ci.yml`（离线 86 例）；推 `v*` 标签跑
+`release.yml`（测试 + PyInstaller 打包 + 发 Release）。
 ```
 
 ## 四、config.json 字段
