@@ -30,3 +30,6 @@ update/
 mumu_help.html
 tools/xml/ui_hierarchy_20260907_223218.xml
 tools/xml/ui_hierarchy_20260907_225817.xml
+
+# WorkBuddy 本地记忆（不入库）
+.workbuddy/
