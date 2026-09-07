@@ -5,7 +5,7 @@ name: Build & Release
 on:
   push:
     branches:
-      - beta
+      - main
 
 permissions:
   contents: write
