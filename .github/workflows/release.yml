@@ -12,17 +12,27 @@ permissions:
 
 jobs:
   auto-tag:
+    # 本次 push 的提交里只要有一个带版本号就触发（不只看最新提交）
     if: |
-      contains(github.event.head_commit.message, 'release: v') ||
-      contains(github.event.head_commit.message, '发版 v')
+      contains(join(github.event.commits.*.message, ' '), 'release: v') ||
+      contains(join(github.event.commits.*.message, ' '), '发版 v')
     runs-on: ubuntu-latest
     steps:
-      - name: Extract version from commit message
+      - name: Checkout (needed for tag target)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Extract version from any commit in this push
         id: ver
         shell: bash
         run: |
-          MSG="${{ github.event.head_commit.message }}"
-          VER=$(echo "$MSG" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          # 遍历本次 push 全部提交，取第一条含版本号的消息里的版本
+          VER=""
+          for c in $(git log --oneline origin/main -n 20 | awk '{print $1}'); do
+            M=$(git log -1 --format=%s "$c")
+            V=$(echo "$M" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            if [ -n "$V" ]; then VER="$V"; break; fi
+          done
           echo "ver=$VER"
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
       - name: Create/Update version tag
