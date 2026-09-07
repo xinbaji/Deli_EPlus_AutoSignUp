@@ -17,6 +17,8 @@ jobs:
       contains(join(github.event.commits.*.message, ' '), 'release: v') ||
       contains(join(github.event.commits.*.message, ' '), '发版 v')
     runs-on: ubuntu-latest
+    outputs:
+      ver: ${{ steps.ver.outputs.ver }}
     steps:
       - name: Checkout (needed for tag target)
         uses: actions/checkout@v4
@@ -104,8 +106,10 @@ jobs:
           exit $code
 
       - name: Upload Release
+        # 分支 push 触发时 github.ref 不是 tag，必须显式传 tag_name（auto-tag job 已打好 v 标签）
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.auto-tag.outputs.ver }}
           files: dist/Deli_EPlus_AutoSignUp_portable.zip
           generate_release_notes: true
         env:
