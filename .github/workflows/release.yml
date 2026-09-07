@@ -1,16 +1,40 @@
 name: Build & Release
 
-# 推送 v* 标签时自动：打包便携 zip → 创建 Release 并上传
+# 触发：推送到 beta 分支，且提交信息含版本号（"release: vX.X.X" / "发版 vX.X.X"）。
+# 命中后自动打对应 v 标签并跑测试 + 打包 + 发 Release。
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - beta
 
 permissions:
   contents: write
 
 jobs:
+  auto-tag:
+    if: |
+      contains(github.event.head_commit.message, 'release: v') ||
+      contains(github.event.head_commit.message, '发版 v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version from commit message
+        id: ver
+        shell: bash
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          VER=$(echo "$MSG" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo "ver=$VER"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+      - name: Create/Update version tag
+        if: steps.ver.outputs.ver != ''
+        shell: bash
+        run: |
+          VER="${{ steps.ver.outputs.ver }}"
+          git tag -f "$VER" "${{ github.sha }}"
+          git push origin "$VER" --force
+
   release:
+    needs: auto-tag
     runs-on: windows-latest
     env:
       PYTHONIOENCODING: utf-8
