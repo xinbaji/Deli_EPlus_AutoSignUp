@@ -35,8 +35,9 @@ _API_PREFIXES = [
 ]
 _API_BASE = f"https://api.github.com/repos/{REPO}/releases/latest"
 _DOWNLOAD_TEMPLATE = "https://github.com/{repo}/releases/download/{tag}/{asset}"
-_MIRROR_PREFIXES = ["", "https://api.gitproxy.dev/", "https://gh-proxy.com/",
-                    "https://ghproxy.net/", "https://ghproxy.cn/"]
+# 下载候选顺序：gitproxy.dev 实测最快且稳定，直连作最后兜底
+_MIRROR_PREFIXES = ["https://api.gitproxy.dev/", "https://gh-proxy.com/",
+                    "https://ghproxy.net/", "https://ghproxy.cn/", ""]
 
 
 def normalize_source(source: str) -> str:

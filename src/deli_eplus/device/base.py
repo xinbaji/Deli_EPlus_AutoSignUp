@@ -10,7 +10,7 @@
 """
 
 from __future__ import annotations
-
+from adbutils import AdbError
 import logging
 import threading
 import time
@@ -194,6 +194,9 @@ class AndroidDevice:
                         self._log.debug("元素已出现: %s（等待 %.1fs）",
                                         selector, waited)
                         return index, Element(sel.get_last_match(), selector, device)
+            except AdbError as ae:
+                if "offline" in str(ae):
+                    self.connect()
             except Exception as e:
                 last_error = e
                 self._log.debug("查询界面失败，稍后重试: %r", e)
@@ -243,38 +246,53 @@ class AndroidDevice:
         return element
 
     def click_until(self, selector: Selector, until_selector: Selector, *,
-                    schedule: tuple[float, ...] = (2.0, 3.0, 4.0)) -> Element:
-        """点击 selector 并等待 until_selector 出现；未出现再点一遍。
+                    timeout: int, poll: float = 0.5) -> Element:
+        """点击 selector 直到 until_selector 出现；页面动画可能吞点击，靠重复补点。
 
-        每轮 = 点击一次 -> 在预算内轮询 until：
-        - until 出现：立即返回（预算只是上限，成功路径不等待）
-        - 预算耗尽：进入下一轮（重新 find 源并点击）
-        页面切换动画期间点击可能被静默丢弃，靠多轮覆盖。
+        整体预算为 timeout 秒（不再是"固定几轮、每轮点完再等"），每轮：
+        - 先检查 until：只要它出现就立即成功返回——即使源按钮已消失（点进后续
+          页面）或尚未出现，目标出现即命中，绝不空等；
+        - 源按钮还在且距上次点击超过 1 秒则补点一次（防连点重复提交）；
+        - 源按钮已消失就只轮询 until，不再回头空找源。
+        超时报错携带真实等待时长与期间最后一次底层错误。
         """
+        deadline = time.monotonic() + timeout
+        clicked_once = False
+        last_click_at = 0.0
         last_error: Optional[Exception] = None
-        for wait in schedule:
+        while True:
+            self._check_stop()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                hint = ""
+                if not clicked_once and last_error is not None:
+                    hint = f" · 期间也未找到 {selector}（{last_error}）"
+                raise DeviceError(
+                    f"点击 {selector} 后 {timeout:g} 秒内未出现 {until_selector}{hint}"
+                ) from last_error
+
+            # 1) 目标已出现：无论源按钮当前状态如何，直接命中
             try:
-                element = self.find(selector, timeout=6)
-            except ElementTimeoutError as e:
+                if self.exists(until_selector):
+                    return self.find(
+                        until_selector, timeout=max(0.2, min(1.0, remaining)))
+            except Exception as e:  # dump 瞬断等：记下继续轮询
                 last_error = e
-                continue
-            element.click()
-            self._log.debug("点击: %s", selector)
-            sub_end = time.monotonic() + wait
-            while True:
-                self._check_stop()
+
+            # 2) 源按钮还在就补点（带 1 秒冷却，避免对同一按钮高频重复点击）
+            now = time.monotonic()
+            if now - last_click_at >= 1.0:
                 try:
-                    if self.exists(until_selector):
-                        return self.find(until_selector, timeout=1)
-                except Exception as e:  # dump 瞬断
-                    last_error = e
-                if time.monotonic() >= sub_end:
-                    break
-                time.sleep(0.3)
-            last_error = ElementTimeoutError([until_selector], wait)
-        raise DeviceError(
-            f"点击 {selector} 后 {sum(schedule):g} 秒内未出现 {until_selector}"
-        ) from last_error
+                    element = self.find(selector, timeout=min(poll, remaining))
+                except ElementTimeoutError as e:
+                    if not clicked_once:
+                        last_error = e
+                else:
+                    element.click()
+                    clicked_once = True
+                    last_click_at = time.monotonic()
+                    self._log.debug("点击: %s", selector)
+            time.sleep(poll)
 
     def wait_ui_stable(self, timeout: float = 3.0, interval: float = 0.25) -> None:
         """等待界面渲染稳定：连续两次 UI 层级快照一致即认为动画结束。

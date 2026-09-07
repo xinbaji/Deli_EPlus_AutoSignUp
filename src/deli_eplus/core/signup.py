@@ -34,6 +34,11 @@ def _text(text: str) -> str:
     return f"//android.widget.TextView[@text='{text}']"
 
 
+def _contains(fragment: str) -> str:
+    """文本模糊匹配（App 改版文案会漂移，如 范围->位置，用 contains 兼容新旧版）。"""
+    return f"//android.widget.TextView[contains(@text,'{fragment}')]"
+
+
 PHONE_INPUT = f"//android.widget.EditText[@resource-id='{ResourcePrefix}et_phone']"
 PASSWORD_INPUT = f"//android.widget.EditText[@resource-id='{ResourcePrefix}et_password']"
 
@@ -45,16 +50,19 @@ CONFIRM_BUTTON = _text("确定")      # 各类弹窗的确认
 LOGIN_BUTTON = _text("登录")
 AGREE_BUTTON = _text("同意并继续")
 ATTENDANCE_ENTRY = _text("智能考勤")
-IN_RANGE = _text("已在打卡范围内")
-NOT_IN_RANGE = _text("不在打卡范围内")
+# 打卡页状态（得力E+ 3.0 改版后文案为“打卡位置内”，老版本为“打卡范围内”，
+# 用 contains 统一兼容；定位完成前会一直停在“正在获取当前位置”）
+IN_RANGE = _contains("已在打卡")
+OUT_RANGE = _contains("不在打卡")
+GETTING_LOCATION = _contains("正在获取当前位置")
 REFRESH_BUTTON = _text("刷新")
 PUNCH_BUTTON = _text("打卡")
 PUNCH_CONFIRM = "//android.widget.ImageButton"   # 打卡弹出的确认大按钮
 
 # 登录页候选：广告(跳过) / 已登录(我的) / 目标(登录)
 LAUNCH_CANDIDATES = (SKIP_AD, MINE_TAB, LOGIN_BUTTON)
-# 考勤页候选
-RANGE_CANDIDATES = (IN_RANGE, NOT_IN_RANGE)
+# 考勤页候选：在内 / 在外 / 仍在定位中（定位中触发重新注入虚拟定位）
+RANGE_CANDIDATES = (IN_RANGE, OUT_RANGE, GETTING_LOCATION)
 
 # MuMu 1080P 分辨率下，设置页向上滑动以露出"退出登录"
 SCROLL_UP = (515, 1662, 515, 457, 0.3)
@@ -203,14 +211,15 @@ class SignupFlow:
         device.type_text(PHONE_INPUT, phone)
         device.type_text(PASSWORD_INPUT, password)
         # 登录点击可能被切换动画吞掉：以"同意并继续"出现为准，无效就再点
-        device.click_until(LOGIN_BUTTON, AGREE_BUTTON, schedule=(3.0, 5.0, 6.0))
+        device.click_until(LOGIN_BUTTON, AGREE_BUTTON, timeout=15)
 
         # 登录后、进入主页前设置虚拟定位，确保考勤页面读到正确位置
         device.set_location(
             float(self._location.get("latitude", 45.0)),
             float(self._location.get("longitude", 45.0)),
         )
-        device.click_until(AGREE_BUTTON, ATTENDANCE_ENTRY, schedule=(2.0, 3.0))
+        device.click_until(AGREE_BUTTON, ATTENDANCE_ENTRY, timeout=15)
+        device.click(ATTENDANCE_ENTRY)
         self._punch(device)
         self._logout(device)
 
@@ -218,6 +227,7 @@ class SignupFlow:
         self._check_stop()
         deadline = time.monotonic() + PUNCH_TIMEOUT
         reclicked = False
+        last_inject = 0.0
         while True:
             self._check_stop()
             try:
@@ -238,14 +248,33 @@ class SignupFlow:
                         pass
                 continue
             if index == 0:
-                break
-            device.click(REFRESH_BUTTON)   # 不在范围内 → 刷新位置
+                break                              # 已在打卡范围内/位置内
+            if index == 1:
+                # 不在范围 → 点「刷新」让 App 重新取一次位置
+                try:
+                    device.click(REFRESH_BUTTON, timeout=2)
+                except ElementTimeoutError:
+                    pass
+                continue
+            # index == 2：打卡页停在「正在获取当前位置」。
+            # 实测 MuMu 虚拟定位若在 App 发起定位请求前注入会被错过，
+            # 页面已就绪时重新注入一次（节流 5s）即可让 App 采纳坐标。
+            if time.monotonic() - last_inject >= 5.0:
+                last_inject = time.monotonic()
+                self._log.info("考勤页仍在定位中，重新注入虚拟定位以触发位置更新")
+                try:
+                    device.set_location(
+                        float(self._location.get("latitude", 45.0)),
+                        float(self._location.get("longitude", 45.0)),
+                    )
+                except DeviceError as e:
+                    self._log.debug("重新注入定位失败（忽略）: %s", e)
 
         if self._debug:
             self._log.success("调试模式：已验证到打卡窗口，跳过实际打卡")
             return
 
-        confirm = device.click_until(PUNCH_BUTTON, PUNCH_CONFIRM, schedule=(2.0, 4.0, 6.0))
+        confirm = device.click_until(PUNCH_BUTTON, PUNCH_CONFIRM, timeout=15)
         confirm.click()
         if not device.wait_gone(PUNCH_CONFIRM, timeout=15):
             raise DeviceError("点击打卡后确认按钮未消失：打卡可能未成功，请人工核对")
@@ -261,7 +290,7 @@ class SignupFlow:
         """
         self._check_stop()
         # 我的 tab -> 出现「设置」入口（点击被吞则重试）
-        device.click_until(MINE_TAB, SETTINGS_ITEM, schedule=(3.0, 5.0))
+        device.click_until(MINE_TAB, SETTINGS_ITEM, timeout=15)
         # 进入设置页
         device.click(SETTINGS_ITEM, timeout=8)
         self._reveal_logout(device)
@@ -283,7 +312,7 @@ class SignupFlow:
 
     def _tap_logout_confirmed(self, device: AndroidDevice) -> None:
         # 点击可能被吞：以「确定」弹窗出现为准，没弹就再点
-        device.click_until(LOGOUT_ITEM, CONFIRM_BUTTON, schedule=(2.0, 3.0, 4.0))
+        device.click_until(LOGOUT_ITEM, CONFIRM_BUTTON,timeout=15)
         device.click(CONFIRM_BUTTON, timeout=6)
         if not device.wait_gone(LOGOUT_ITEM, timeout=10):
             raise DeviceError("确认退出后界面未返回：请人工检查 App 状态")

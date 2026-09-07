@@ -20,7 +20,7 @@ from deli_eplus.core.signup import (
     LOGIN_BUTTON,
     LOGOUT_ITEM,
     MINE_TAB,
-    NOT_IN_RANGE,
+    OUT_RANGE,
     Package,
     PUNCH_BUTTON,
     PUNCH_CONFIRM,
@@ -78,16 +78,22 @@ class ScriptedDevice:
         element.click()
         return element
 
-    def click_until(self, selector, until_selector, schedule=(2.0, 3.0, 4.0)):
+    def click_until(self, selector, until_selector, *, timeout=15):
+        """与真实实现同语义的剧本版：until 一出现即返回；否则重复补点源。
+
+        剧本点击同步换屏，正常一轮或几轮内命中；上限循环防止意外时死循环，
+        结束后抛 DeviceError 与真实实现对齐（上层按账号失败处理）。
+        """
         last = None
-        for wait in schedule:
-            self.click(selector, timeout=6)
+        for _ in range(max(3, timeout)):
+            if until_selector in self.screen:
+                return _ScriptedElement(self, until_selector)
             try:
-                return self.find(until_selector, timeout=wait)
+                self.click(selector, timeout=0.05)
             except ElementTimeoutError as e:
                 last = e
         raise DeviceError(
-            f"点击 {selector} 后未出现 {until_selector}（重试 {len(schedule)} 次无效）") from last
+            f"点击 {selector} 后未出现 {until_selector}（预算 {timeout} 秒）") from last
 
     def wait_ui_stable(self, timeout=3.0, interval=0.25):
         return None
@@ -212,9 +218,9 @@ def test_debug_mode_skips_actual_punch(monkeypatch):
 
 def test_out_of_range_refreshes_until_in_range(monkeypatch):
     transitions = punch_transitions()
-    # 改为：进入考勤页时"不在打卡范围内"，刷新两次后才进入范围
+    # 改为：进入考勤页时"不在打卡位置内"，刷新两次后才进入范围
     transitions[("click", ATTENDANCE_ENTRY)] = goto(
-        NOT_IN_RANGE, REFRESH_BUTTON, MINE_TAB)
+        OUT_RANGE, REFRESH_BUTTON, MINE_TAB)
 
     device = ScriptedDevice(set(LOGIN_PAGE), transitions)
     state = {"refreshes": 0}
@@ -225,7 +231,7 @@ def test_out_of_range_refreshes_until_in_range(monkeypatch):
         if key == ("click", REFRESH_BUTTON):
             state["refreshes"] += 1
             if state["refreshes"] >= 2:
-                device.screen.discard(NOT_IN_RANGE)
+                device.screen.discard(OUT_RANGE)
                 device.screen.add(IN_RANGE)
                 device.screen.add(PUNCH_BUTTON)
 

@@ -56,13 +56,13 @@ def test_latest_release_github(monkeypatch):
     info = updater.latest_release("github")
 
     assert info["tag"] == "1.2.3"
-    assert info["asset_urls"][0] == updater._DOWNLOAD_TEMPLATE.format(
-        repo=updater.REPO, tag="v1.2.3", asset=updater.ASSET_NAME)
     assert "api.github.com" in captured["url"]
     assert "?t=" in captured["url"]  # cache-buster
-    # 回退链：直连在前，gitproxy.dev 其次，gh-proxy 再次
-    assert info["asset_urls"][1].startswith("https://api.gitproxy.dev/")
-    assert info["asset_urls"][2].startswith("https://gh-proxy.com/")
+    # 回退链：gitproxy.dev 在前（实测最快），直连 github 兜底
+    assert info["asset_urls"][0].startswith("https://api.gitproxy.dev/")
+    assert info["asset_urls"][0].endswith(
+        f"v1.2.3/{updater.ASSET_NAME}")
+    assert info["asset_urls"][-1].startswith("https://github.com/")
 
 
 def test_latest_release_mirror_prefers_gitproxy(monkeypatch):
