@@ -22,7 +22,7 @@ def test_mumu_install_ok(device):
 def test_adb_connected(device):
     """ADB/uiautomator2 已连上且服务可用（u2.connect + info 探活全过）。"""
     assert device.connected
-    device._require_connected().info  # 再探一次，确认 atx-agent 正常应答
+    _ = device._require_connected().info  # 再探一次，确认 atx-agent 正常应答
 
 
 def test_ui_dump(device):

@@ -16,7 +16,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import webview
 
@@ -57,11 +57,11 @@ class Api:
 
     def __init__(self, config: Config):
         self._cfg = config
-        self._window: Optional[webview.Window] = None
+        self._window: webview.Window | None = None
         self._log = get_logger("webui")
         self._stop_token = _StopToken()
-        self._worker: Optional[threading.Thread] = None
-        self._flow: Optional[SignupFlow] = None
+        self._worker: threading.Thread | None = None
+        self._flow: SignupFlow | None = None
         self._running = False
         self._last_feed: list[tuple[str, int]] = []
         self._last_detail = ""
@@ -72,9 +72,17 @@ class Api:
         payload = json.dumps({"type": event_type, "data": data}, ensure_ascii=False)
         try:
             if self._window is not None:
-                self._window.evaluate_js(f"window.__pushEvent && window.__pushEvent({payload})")
+                self._window.evaluate_js(
+                    f"window.__pushEvent && window.__pushEvent({payload})"
+                )
         except Exception:  # 窗口关闭中，推送失败可忽略
             pass
+
+    def _require_window(self) -> webview.Window:
+        """取窗口做文件对话框；窗口在 run_app 里创建后注入，未注入即编程错误。"""
+        if self._window is None:
+            raise RuntimeError("窗口尚未创建")
+        return self._window
 
     def _brief(self) -> dict[str, Any]:
         return {
@@ -94,8 +102,12 @@ class Api:
 
     def get_initial(self) -> dict[str, Any]:
         return {
-            "app": {"name": APP_NAME, "version": VERSION,
-                    "author": AUTHOR, "repo": REPO_URL},
+            "app": {
+                "name": APP_NAME,
+                "version": VERSION,
+                "author": AUTHOR,
+                "repo": REPO_URL,
+            },
             "theme": self._cfg.theme,
             "download_source": self._cfg.download_source,
             "close_emulator_after": self._cfg.close_emulator_after,
@@ -139,7 +151,9 @@ class Api:
             return self._err(e)
         return {"ok": True, "users": self._cfg.users}
 
-    def update_account(self, old_phone: str, phone: str, password: str) -> dict[str, Any]:
+    def update_account(
+        self, old_phone: str, phone: str, password: str
+    ) -> dict[str, Any]:
         try:
             if phone != old_phone:
                 if phone in self._cfg.users:
@@ -159,8 +173,9 @@ class Api:
     # ---------- 导入导出 / 系统 ----------
 
     def export_config(self) -> dict[str, Any]:
-        target = self._window.create_file_dialog(
-            webview.SAVE_DIALOG, save_filename="deli_eplus_config.json",
+        target = self._require_window().create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename="deli_eplus_config.json",
             file_types=("JSON 配置 (*.json)", "所有文件 (*.*)"),
         )
         if not target:
@@ -173,21 +188,22 @@ class Api:
         return {"ok": True, "path": target}
 
     def import_config(self) -> dict[str, Any]:
-        source = self._window.create_file_dialog(
-            webview.OPEN_DIALOG, allow_multiple=False,
+        source = self._require_window().create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=False,
             file_types=("JSON 配置 (*.json)", "所有文件 (*.*)"),
         )
         if not source:
             return {"ok": False, "cancelled": True}
-        source = source[0] if isinstance(source, (list, tuple)) else source
+        path = source[0] if isinstance(source, (list, tuple)) else source
         try:
-            self._cfg.import_from(source)
+            self._cfg.import_from(str(path))
         except (OSError, ConfigError, ValueError) as e:
             return {"ok": False, "error": str(e)}
         return {"ok": True, "users": self._cfg.users}
 
     def browse_folder(self) -> str:
-        chosen = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        chosen = self._require_window().create_file_dialog(webview.FOLDER_DIALOG)
         if chosen and isinstance(chosen, (list, tuple)):
             return str(chosen[0])
         return ""
@@ -278,15 +294,19 @@ class Api:
             self._log.info("下载更新 %s …", info["tag"])
             try:
                 updater.download(
-                    info["asset_urls"], dest,
+                    info["asset_urls"],
+                    dest,
                     progress=lambda pct: self._push(
-                        "update", {"status": "progress", "percent": pct}),
+                        "update", {"status": "progress", "percent": pct}
+                    ),
                 )
             except Exception as e:
                 self._push("update", {"status": "error", "message": f"下载失败：{e}"})
                 return
-            self._push("update", {"status": "downloaded", "path": str(dest),
-                                  "tag": info["tag"]})
+            self._push(
+                "update",
+                {"status": "downloaded", "path": str(dest), "tag": info["tag"]},
+            )
 
         threading.Thread(target=work, daemon=True, name="update-download").start()
         return {"ok": True, "dir": str(update_dir)}
@@ -316,8 +336,9 @@ class Api:
             return self._err(ConfigError("请先填写并保存 MuMu 安装目录"))
         from .device import MuMuDevice
 
-        device = MuMuDevice(self._cfg.serial, self._cfg.emulator_path,
-                            self._cfg.emulator_num)
+        device = MuMuDevice(
+            self._cfg.serial, self._cfg.emulator_path, self._cfg.emulator_num
+        )
         problems = device.check_install()
         if problems:
             return {"ok": False, "error": "；".join(problems)}
@@ -334,11 +355,18 @@ class Api:
 
         def work() -> None:
             try:
-                device = MuMuDevice(self._cfg.serial, self._cfg.emulator_path,
-                                    self._cfg.emulator_num)
+                device = MuMuDevice(
+                    self._cfg.serial, self._cfg.emulator_path, self._cfg.emulator_num
+                )
                 device.set_location(latitude, longitude)
-                self._push("detect", {"target": "loc", "ok": True,
-                                      "message": f"已下发 ({latitude}, {longitude})"})
+                self._push(
+                    "detect",
+                    {
+                        "target": "loc",
+                        "ok": True,
+                        "message": f"已下发 ({latitude}, {longitude})",
+                    },
+                )
             except DeviceError as e:
                 self._push("detect", {"target": "loc", "ok": False, "message": str(e)})
 
@@ -363,19 +391,37 @@ class Api:
         debug_flag = bool(debug)
 
         def on_account(phone: str, state: str, message: str) -> None:
-            self._push("account", {"phone": phone, "state": state,
-                                   "message": message,
-                                   "doneAt": time.strftime("%H:%M:%S") if state == "done" else ""})
+            self._push(
+                "account",
+                {
+                    "phone": phone,
+                    "state": state,
+                    "message": message,
+                    "doneAt": time.strftime("%H:%M:%S") if state == "done" else "",
+                },
+            )
 
         def on_run(state: str, message: str) -> None:
             if state == "started":
                 self._push("run", {"state": "started", "debug": debug_flag})
             elif state == "finished":
-                self._push("run", {"state": "finished", "message": message,
-                                   "has_failure": "失败" in (message or "")})
+                self._push(
+                    "run",
+                    {
+                        "state": "finished",
+                        "message": message,
+                        "has_failure": "失败" in (message or ""),
+                    },
+                )
             elif state == "aborted":
-                self._push("run", {"state": "aborted", "message": message,
-                                   "detail": self._last_detail})
+                self._push(
+                    "run",
+                    {
+                        "state": "aborted",
+                        "message": message,
+                        "detail": self._last_detail,
+                    },
+                )
 
         def work() -> None:
             try:
@@ -389,7 +435,9 @@ class Api:
                     close_emulator_after=self._cfg.close_emulator_after,
                     on_account=on_account,
                     on_run=on_run,
-                    stop_check=self._stop_token.stopped,
+                    # stopped 是 property（返回 bool），必须包成可调用对象传给流程，
+                    # 否则 __init__ 里的 `or` 兜底会把它吞掉，停止按钮彻底失效。
+                    stop_check=lambda: self._stop_token.stopped,
                 )
                 self._flow = flow
                 flow.run()
@@ -434,20 +482,20 @@ def run_app() -> int:
         pending = base_dir() / "update" / updater.ASSET_NAME
         if getattr(_sys, "frozen", False) and pending.is_file():
             log.info("检测到已下载的更新包，先应用更新再启动…")
-            updater.apply_update(pending, base_dir(),
-                                 Path(_sys.executable).name)
+            updater.apply_update(pending, base_dir(), Path(_sys.executable).name)
             return 0
     except Exception as e:
         log.warning("应用更新包失败（忽略，正常启动）: %s", e)
 
     # 单例化：命名互斥量，重复启动直接提示退出
     _mutex = ctypes.windll.kernel32.CreateMutexW(
-        None, False, r"Local\DeliEPlus_AutoSignUp_SingleInstance")
+        None, False, r"Local\DeliEPlus_AutoSignUp_SingleInstance"
+    )
     if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
         log.warning("已有实例在运行，拒绝重复启动")
         ctypes.windll.user32.MessageBoxW(
-            None, "得力E+ 自动签到已在运行中，请勿重复启动。",
-            APP_NAME, 0x40)
+            None, "得力E+ 自动签到已在运行中，请勿重复启动。", APP_NAME, 0x40
+        )
         return 1
     _ = _mutex  # 句柄保持打开直到进程退出（互斥量即存活）
 
@@ -458,10 +506,13 @@ def run_app() -> int:
         APP_NAME,
         url=str(web_dir() / "index.html"),
         js_api=api,
-        width=1120, height=760,
+        width=1120,
+        height=760,
         min_size=(1000, 680),
         background_color="#f5f5f5",
     )
+    if window is None:  # pragma: no cover - create_window 失败本身会抛异常
+        raise RuntimeError("创建窗口失败")
     api._window = window  # noqa: SLF001
 
     # 日志活动流轮询线程：批量推给前端
@@ -476,9 +527,13 @@ def run_app() -> int:
                     api._last_feed.extend(items)  # noqa: SLF001
                     api._last_feed = api._last_feed[-400:]  # noqa: SLF001
                     # 中止时错误卡片需要动态流尾部做技术详情
-                    api._last_detail = "\n".join(m for m, _ in api._last_feed[-25:])  # noqa: SLF001
-                    api._push("feed", {"items": [
-                        {"message": m, "level": lv} for m, lv in items]})
+                    api._last_detail = "\n".join(
+                        m for m, _ in api._last_feed[-25:]
+                    )  # noqa: SLF001
+                    api._push(
+                        "feed",
+                        {"items": [{"message": m, "level": lv} for m, lv in items]},
+                    )
             feed_stop.wait(FEED_POLL)
 
     def on_closed() -> None:

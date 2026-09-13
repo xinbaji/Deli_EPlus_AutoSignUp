@@ -15,8 +15,11 @@ def test_setup_idempotent_single_feed():
     log1 = applog.get("test")
     log2 = applog.get("test")
     assert log1 is log2
-    handlers = [h for h in applog.get("test").parent.handlers
-                if isinstance(h, applog.ActivityFeedHandler)]
+    handlers = [
+        h
+        for h in applog.get("test").parent.handlers
+        if isinstance(h, applog.ActivityFeedHandler)
+    ]
     assert len(handlers) == 1
 
 
@@ -30,7 +33,9 @@ def test_feed_receives_and_drains():
     log.warning("警告消息")
     items = feed.drain()
     assert [level for _, level in items] == [
-        logging.INFO, applog.SUCCESS, logging.WARNING,
+        logging.INFO,
+        applog.SUCCESS,
+        logging.WARNING,
     ]
 
 

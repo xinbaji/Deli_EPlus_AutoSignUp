@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import logging
@@ -68,20 +69,21 @@ def normalize(raw: Any) -> dict[str, Any]:
 
     data["serial"] = str(raw.get("serial") or data["serial"]).strip()
     data["emulator_path"] = str(raw.get("emulator_path") or "").strip()
-    data["emulator_num"] = str(raw.get("emulator_num", data["emulator_num"])).strip() or "0"
+    data["emulator_num"] = (
+        str(raw.get("emulator_num", data["emulator_num"])).strip() or "0"
+    )
     data["theme"] = "dark" if raw.get("theme") == "dark" else "light"
-    data["download_source"] = ("github" if raw.get("download_source") == "github"
-                               else "mirror")
+    data["download_source"] = (
+        "github" if raw.get("download_source") == "github" else "mirror"
+    )
     data["close_emulator_after"] = bool(raw.get("close_emulator_after", False))
     data["auto_update"] = bool(raw.get("auto_update", True))
 
     loc = raw.get("location")
     if isinstance(loc, dict):
         for key in ("latitude", "longitude"):
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 data["location"][key] = float(loc.get(key, data["location"][key]))
-            except (TypeError, ValueError):
-                pass
 
     users = raw.get("users")
     if isinstance(users, dict):
@@ -114,7 +116,9 @@ class Config:
                     raw = json.loads(self.path.read_text("utf-8"))
                 except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
                     self._backup_corrupted()
-                    logger.warning("config.json 无法解析（%s），已备份并改用默认配置", e)
+                    logger.warning(
+                        "config.json 无法解析（%s），已备份并改用默认配置", e
+                    )
                     raw = None
             self._data = normalize(raw)
             if not self.path.exists():

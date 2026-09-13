@@ -17,7 +17,11 @@ LOGS = PROJECT_ROOT / "logs"
 
 ROW_RE = re.compile(r"^(.+?)\s+(-?\d+\.\d+)s\s*$")
 DASH_RE = re.compile(r"^(.+?)\s+—\s*$")
-FOCUS = ("★A 点登录 → 点智能考勤", "★B 点设置 → 退出登录项消失", "★B2 点设置 → 登录页真正出现")
+FOCUS = (
+    "★A 点登录 → 点智能考勤",
+    "★B 点设置 → 退出登录项消失",
+    "★B2 点设置 → 登录页真正出现",
+)
 
 
 def parse(path: Path) -> tuple[list[str], dict[str, float | None]]:
@@ -43,17 +47,13 @@ def fmt(value: float | None) -> str:
 
 def main() -> int:
     args = sys.argv[1:]
-    if args:
-        files = [Path(a) for a in args]
-    else:
-        files = sorted(LOGS.glob("timing-*.txt"))[-3:]
+    files = [Path(a) for a in args] if args else sorted(LOGS.glob("timing-*.txt"))[-3:]
     if not files:
         print("找不到 timing-*.txt", file=sys.stderr)
         return 2
 
     runs = [parse(p) for p in files]
     order = runs[0][0]
-    labels = [p.stem.replace("timing-", "") for p in files]
 
     lines = [
         "# 得力E+ 真机测速报告",
@@ -67,7 +67,8 @@ def main() -> int:
         "",
         "## 重点项（★A / ★B / ★B2）",
         "",
-        "| 指标 | 含义 | " + " | ".join(f"第{i+1}轮" for i in range(len(files)))
+        "| 指标 | 含义 | "
+        + " | ".join(f"第{i+1}轮" for i in range(len(files)))
         + " | 平均 | 最快 | 最慢 |",
         "|---|---|" + "---|" * (len(files) + 3),
     ]
@@ -76,12 +77,18 @@ def main() -> int:
         good = [v for v in vals if v is not None]
         cells = " | ".join(fmt(v) for v in vals)
         avg = f"{sum(good)/len(good):.2f}s" if good else "—"
-        lines.append(f"| {name} | — | {cells} | {avg} | "
-                     f"{fmt(min(good)) if good else '—'} | {fmt(max(good)) if good else '—'} |")
+        lines.append(
+            f"| {name} | — | {cells} | {avg} | "
+            f"{fmt(min(good)) if good else '—'} | {fmt(max(good)) if good else '—'} |"
+        )
 
-    lines += ["", "## 各阶段明细", "",
-              "| 阶段 | " + " | ".join(f"第{i+1}轮" for i in range(len(files))) + " |",
-              "|---|" + "---|" * len(files)]
+    lines += [
+        "",
+        "## 各阶段明细",
+        "",
+        "| 阶段 | " + " | ".join(f"第{i+1}轮" for i in range(len(files))) + " |",
+        "|---|" + "---|" * len(files),
+    ]
     for name in order:
         cells = " | ".join(fmt(r[1].get(name)) for r in runs)
         lines.append(f"| {name} | {cells} |")
@@ -105,12 +112,18 @@ def main() -> int:
     good_a = [v for v in a_vals if v is not None]
     good_b = [v for v in b_vals if v is not None]
     if good_a:
-        lines.append(f"- ★A（点登录→点智能考勤）：**{min(good_a):.2f}~{max(good_a):.2f}s**，"
-                     f"平均 {sum(good_a)/len(good_a):.2f}s。")
+        lines.append(
+            f"- ★A（点登录→点智能考勤）：**{min(good_a):.2f}~{max(good_a):.2f}s**，"
+            f"平均 {sum(good_a)/len(good_a):.2f}s。"
+        )
     if good_b:
-        lines.append(f"- ★B2（点设置→登录页出现）：**{min(good_b):.2f}~{max(good_b):.2f}s**，"
-                     f"平均 {sum(good_b)/len(good_b):.2f}s。")
-    lines.append("- A、B 主要耗时在 App 页面切换/数据加载，框架侧（dump≈37ms）不构成瓶颈。")
+        lines.append(
+            f"- ★B2（点设置→登录页出现）：**{min(good_b):.2f}~{max(good_b):.2f}s**，"
+            f"平均 {sum(good_b)/len(good_b):.2f}s。"
+        )
+    lines.append(
+        "- A、B 主要耗时在 App 页面切换/数据加载，框架侧（dump≈37ms）不构成瓶颈。"
+    )
 
     text = "\n".join(lines) + "\n"
     out = LOGS / f"speed-report-{time.strftime('%Y%m%d-%H%M%S')}.md"

@@ -10,11 +10,14 @@
 """
 
 from __future__ import annotations
-from adbutils import AdbError
+
 import logging
 import threading
 import time
-from typing import Any, Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
+
+from adbutils import AdbError
 
 from .exceptions import (
     AppLaunchError,
@@ -32,8 +35,8 @@ class Element:
     """已命中的具体控件。动作直接作用于底层节点，不触发新的界面 dump。"""
 
     def __init__(self, raw, selector: str, device):
-        self._raw = raw            # uiautomator2 DeviceXMLElement
-        self._device = device      # uiautomator2 Device
+        self._raw = raw  # uiautomator2 DeviceXMLElement
+        self._device = device  # uiautomator2 Device
         self.selector = selector
 
     @property
@@ -49,23 +52,26 @@ class Element:
 
     def clear_and_type(self, text: str) -> None:
         """聚焦输入框，清空原内容后输入。失败会抛错，绝不静默。"""
-        self._raw.click()              # 聚焦
-        self._device.clear_text()      # 清空当前聚焦的输入框
+        self._raw.click()  # 聚焦
+        self._device.clear_text()  # 清空当前聚焦的输入框
         self._device.send_keys(text)
 
 
 class AndroidDevice:
     """一台 adb 设备（模拟器或真机）的操作封装。"""
 
-    def __init__(self, serial: str, *, logger: Optional[logging.Logger] = None):
+    # 是否由本程序拉起（只有模拟器实现会置 True；真机恒为 False）
+    started_by_us: bool = False
+
+    def __init__(self, serial: str, *, logger: logging.Logger | None = None):
         self.serial = serial
         self._log = logger or logging.getLogger("deli_eplus.device")
-        self._u2 = None                     # 延迟创建的 uiautomator2 Device
-        self._stop_check: Optional[StopCheck] = None
+        self._u2 = None  # 延迟创建的 uiautomator2 Device
+        self._stop_check: StopCheck | None = None
 
     # ---------- 停止令牌 ----------
 
-    def set_stop_check(self, check: Optional[StopCheck]) -> None:
+    def set_stop_check(self, check: StopCheck | None) -> None:
         self._stop_check = check
 
     def _check_stop(self) -> None:
@@ -101,7 +107,7 @@ class AndroidDevice:
             return "error", result["error"]
         return "ok", result.get("value")
 
-    def connect(self, timeout: float = 40) -> "AndroidDevice":
+    def connect(self, timeout: float = 40) -> AndroidDevice:
         """连接全部交给 u2.connect（后续命令都基于 u2），看门狗限时循环重试。
 
         经验值：模拟器启动后 30 秒内应完成连接，超时即视为卡死，
@@ -114,12 +120,14 @@ class AndroidDevice:
             state, value = self._bounded(self._u2_connect, timeout=15)
             if state == "ok":
                 self._u2 = value
-                self._log.info("ADB 已连接 %s（%.1f 秒）",
-                               self.serial, time.monotonic() - started)
+                self._log.info(
+                    "ADB 已连接 %s（%.1f 秒）", self.serial, time.monotonic() - started
+                )
                 return self
             reason = "探测超时" if state == "timeout" else f"未就绪（{value}）"
-            self._log.info("等待 ADB/uiautomator（%.0fs，%s）",
-                           time.monotonic() - started, reason)
+            self._log.info(
+                "等待 ADB/uiautomator（%.0fs，%s）", time.monotonic() - started, reason
+            )
             if time.monotonic() >= deadline:
                 raise DeviceConnectionError(
                     f"连接设备 {self.serial} 超时（{timeout:g} 秒）："
@@ -131,7 +139,7 @@ class AndroidDevice:
         import uiautomator2 as u2
 
         device = u2.connect(self.serial)
-        device.info  # 触碰一次，确认 uiautomator 服务可用
+        _ = device.info  # 触碰一次，确认 uiautomator 服务可用
         return device
 
     def _require_connected(self):
@@ -183,7 +191,7 @@ class AndroidDevice:
         device = self._require_connected()
         deadline = time.monotonic() + timeout
         selectors = list(selectors)
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         while True:
             self._check_stop()
             try:
@@ -191,8 +199,9 @@ class AndroidDevice:
                     sel = device.xpath(selector)
                     if sel.exists:  # 一次 dump
                         waited = time.monotonic() - (deadline - timeout)
-                        self._log.debug("元素已出现: %s（等待 %.1fs）",
-                                        selector, waited)
+                        self._log.debug(
+                            "元素已出现: %s（等待 %.1fs）", selector, waited
+                        )
                         return index, Element(sel.get_last_match(), selector, device)
             except AdbError as ae:
                 if "offline" in str(ae):
@@ -204,7 +213,9 @@ class AndroidDevice:
                 raise ElementTimeoutError(selectors, timeout, last_error)
             time.sleep(poll)
 
-    def find(self, selector: Selector, timeout: float = 15, poll: float = 0.5) -> Element:
+    def find(
+        self, selector: Selector, timeout: float = 15, poll: float = 0.5
+    ) -> Element:
         """阻塞等待元素出现；超时抛 ElementTimeoutError。"""
         return self._wait_for([selector], timeout=timeout, poll=poll)[1]
 
@@ -222,7 +233,9 @@ class AndroidDevice:
         except Exception as e:
             raise DeviceConnectionError(f"查询界面失败: {e!r}") from e
 
-    def wait_gone(self, selector: Selector, timeout: float = 15, poll: float = 0.5) -> bool:
+    def wait_gone(
+        self, selector: Selector, timeout: float = 15, poll: float = 0.5
+    ) -> bool:
         """等待元素从界面消失；超时返回 False（调用方决定如何处置）。"""
         device = self._require_connected()
         deadline = time.monotonic() + timeout
@@ -245,8 +258,14 @@ class AndroidDevice:
         self._log.debug("点击: %s", selector)
         return element
 
-    def click_until(self, selector: Selector, until_selector: Selector, *,
-                    timeout: int, poll: float = 0.2) -> Element:
+    def click_until(
+        self,
+        selector: Selector,
+        until_selector: Selector,
+        *,
+        timeout: int,
+        poll: float = 0.2,
+    ) -> Element:
         """反复「点 selector → 立刻查 until」，在 timeout 秒内持续进行。
 
         页面切换动画可能吞掉点击，所以不是"点一次就死等"，而是每轮：
@@ -259,7 +278,7 @@ class AndroidDevice:
         """
         deadline = time.monotonic() + timeout
         clicked_once = False
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         while True:
             self._check_stop()
             remaining = deadline - time.monotonic()
@@ -285,8 +304,8 @@ class AndroidDevice:
             # 2) 立刻在 poll 秒内扫 until，命中即成功返回
             try:
                 return self.find(
-                    until_selector, timeout=max(0.05, min(poll, remaining)),
-                    poll=0.05)
+                    until_selector, timeout=max(0.05, min(poll, remaining)), poll=0.05
+                )
             except ElementTimeoutError:
                 pass
             except StopRequested:
@@ -304,7 +323,7 @@ class AndroidDevice:
         """
         device = self._require_connected()
         deadline = time.monotonic() + timeout
-        last: Optional[str] = None
+        last: str | None = None
         while True:
             self._check_stop()
             try:
@@ -327,6 +346,16 @@ class AndroidDevice:
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.2) -> None:
         device = self._require_connected()
         device.swipe(x1, y1, x2, y2, duration=duration)
+
+    # ---------- 模拟器专属能力（只有 mumu.py 的实现支持） ----------
+
+    def start_emulator(self, timeout: float = 240) -> None:
+        """拉起模拟器实例并连上（见 mumu.py）。"""
+        raise DeviceError("当前设备类型不支持启动模拟器")
+
+    def shutdown_instance(self, timeout: float = 60) -> None:
+        """关闭由本程序拉起的模拟器实例（见 mumu.py）。"""
+        raise DeviceError("当前设备类型不支持关闭模拟器实例")
 
     # ---------- 虚拟定位（仅支持 MuMu 的模拟器实现，见 mumu.py） ----------
 

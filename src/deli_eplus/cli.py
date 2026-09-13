@@ -11,7 +11,8 @@ import sys
 from . import VERSION
 from .config import Config, mask_phone
 from .device import DeviceError
-from .log import get as get_logger, setup as setup_log
+from .log import get as get_logger
+from .log import setup as setup_log
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,8 +20,9 @@ def main(argv: list[str] | None = None) -> int:
         prog="deli_eplus",
         description="得力E+ 自动签到（命令行版，与 GUI 共用同一套流程）",
     )
-    parser.add_argument("--debug", action="store_true",
-                        help="调试签到：走完整流程但不实际打卡")
+    parser.add_argument(
+        "--debug", action="store_true", help="调试签到：走完整流程但不实际打卡"
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     args = parser.parse_args(argv)
 
@@ -30,7 +32,9 @@ def main(argv: list[str] | None = None) -> int:
 
     config = Config()
     if not config.emulator_path:
-        log.error("未配置模拟器路径，请先在 GUI 设置页配置（config.json: emulator_path）")
+        log.error(
+            "未配置模拟器路径，请先在 GUI 设置页配置（config.json: emulator_path）"
+        )
         return 1
     users = config.users
     if not users:
@@ -47,8 +51,11 @@ def main(argv: list[str] | None = None) -> int:
 
     def on_run(state: str, message: str) -> None:
         if state == "started":
-            log.success("本轮签到开始%s，共 %d 个账号",
-                        "（调试模式，不实际打卡）" if args.debug else "", len(users))
+            log.success(
+                "本轮签到开始%s，共 %d 个账号",
+                "（调试模式，不实际打卡）" if args.debug else "",
+                len(users),
+            )
         elif state == "finished":
             log.success(message or "签到结束")
         elif state == "aborted":

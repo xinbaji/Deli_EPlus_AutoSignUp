@@ -21,14 +21,14 @@ from deli_eplus.core.signup import (
     LOGOUT_ITEM,
     MINE_TAB,
     OUT_RANGE,
-    Package,
-    PUNCH_BUTTON,
-    PUNCH_CONFIRM,
     PASSWORD_INPUT,
     PHONE_INPUT,
+    PUNCH_BUTTON,
+    PUNCH_CONFIRM,
     REFRESH_BUTTON,
     SETTINGS_ITEM,
     SKIP_AD,
+    Package,
     SignupFlow,
 )
 from deli_eplus.device.exceptions import DeviceError, ElementTimeoutError
@@ -93,7 +93,8 @@ class ScriptedDevice:
             except ElementTimeoutError as e:
                 last = e
         raise DeviceError(
-            f"点击 {selector} 后未出现 {until_selector}（预算 {timeout} 秒）") from last
+            f"点击 {selector} 后未出现 {until_selector}（预算 {timeout} 秒）"
+        ) from last
 
     def wait_ui_stable(self, timeout=3.0, interval=0.25):
         return None
@@ -157,8 +158,17 @@ def punch_transitions():
     }
 
 
-def make_flow(monkeypatch, screen, transitions, *, users=None, debug=False,
-              stop=None, run_events=None, patch_punch_timeout=False):
+def make_flow(
+    monkeypatch,
+    screen,
+    transitions,
+    *,
+    users=None,
+    debug=False,
+    stop=None,
+    run_events=None,
+    patch_punch_timeout=False,
+):
     if patch_punch_timeout:
         monkeypatch.setattr(signup, "PUNCH_TIMEOUT", 0.3)
     device = ScriptedDevice(screen, transitions)
@@ -166,7 +176,9 @@ def make_flow(monkeypatch, screen, transitions, *, users=None, debug=False,
     run_events = run_events if run_events is not None else []
     monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
         users=users or {"13800001111": "pw"},
         location={"latitude": 31.2, "longitude": 121.4},
         debug=debug,
@@ -219,8 +231,7 @@ def test_debug_mode_skips_actual_punch(monkeypatch):
 def test_out_of_range_refreshes_until_in_range(monkeypatch):
     transitions = punch_transitions()
     # 改为：进入考勤页时"不在打卡位置内"，刷新两次后才进入范围
-    transitions[("click", ATTENDANCE_ENTRY)] = goto(
-        OUT_RANGE, REFRESH_BUTTON, MINE_TAB)
+    transitions[("click", ATTENDANCE_ENTRY)] = goto(OUT_RANGE, REFRESH_BUTTON, MINE_TAB)
 
     device = ScriptedDevice(set(LOGIN_PAGE), transitions)
     state = {"refreshes": 0}
@@ -237,9 +248,13 @@ def test_out_of_range_refreshes_until_in_range(monkeypatch):
 
     device._apply = apply
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
-        on_account=lambda *a: None, on_run=lambda *a: None,
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={"13800001111": "pw"},
+        location={"latitude": 45, "longitude": 45},
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
 
@@ -256,8 +271,11 @@ def test_punch_window_timeout_marks_account_failed(monkeypatch):
     }
     run_events: list[tuple] = []
     _, flow, account_events, run_events = make_flow(
-        monkeypatch, set(LOGIN_PAGE), transitions,
-        run_events=run_events, patch_punch_timeout=False,
+        monkeypatch,
+        set(LOGIN_PAGE),
+        transitions,
+        run_events=run_events,
+        patch_punch_timeout=False,
     )
     ok = flow.run()
 
@@ -276,7 +294,10 @@ def test_account_failure_continues_to_next_account(monkeypatch):
     users = {"13800001111": "pw", "13800002222": "pw"}
     monkeypatch.setattr(signup, "ENTER_LOGIN_TIMEOUT", 1)
     _, flow, account_events, _ = make_flow(
-        monkeypatch, set(LOGIN_PAGE), transitions, users=users,
+        monkeypatch,
+        set(LOGIN_PAGE),
+        transitions,
+        users=users,
         patch_punch_timeout=False,
     )
     ok = flow.run()
@@ -308,9 +329,13 @@ def test_enter_login_page_handles_ad_and_logout():
     }
     device = ScriptedDevice({SKIP_AD}, transitions)
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={}, location={"latitude": 45, "longitude": 45},
-        on_account=lambda *a: None, on_run=lambda *a: None,
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={},
+        location={"latitude": 45, "longitude": 45},
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     flow._enter_login_page(device)
 
@@ -323,9 +348,13 @@ def test_enter_login_page_timeout(monkeypatch):
     monkeypatch.setattr(signup, "ENTER_LOGIN_TIMEOUT", 0.4)
     device = ScriptedDevice(set())  # 黑屏：什么都等不到
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={}, location={"latitude": 45, "longitude": 45},
-        on_account=lambda *a: None, on_run=lambda *a: None,
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={},
+        location={"latitude": 45, "longitude": 45},
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     with pytest.raises(DeviceError) as exc:
         flow._enter_login_page(device)
@@ -346,9 +375,14 @@ def test_logout_click_lost_then_retry(monkeypatch):
     transitions[("click", LOGOUT_ITEM)] = flaky_logout
     device = ScriptedDevice(set(LOGIN_PAGE), transitions)
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
-        debug=True, on_account=lambda *a: None, on_run=lambda *a: None,
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={"13800001111": "pw"},
+        location={"latitude": 45, "longitude": 45},
+        debug=True,
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
 
@@ -372,15 +406,21 @@ def test_login_click_lost_then_retry(monkeypatch):
     transitions[("click", LOGIN_BUTTON)] = flaky_login
     device = ScriptedDevice(set(LOGIN_PAGE), transitions)
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
-        debug=True, on_account=lambda *a: None, on_run=lambda *a: None,
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={"13800001111": "pw"},
+        location={"latitude": 45, "longitude": 45},
+        debug=True,
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
 
     assert flow.run() is True
     login_clicks = [c for c in device.calls if c == ("click", LOGIN_BUTTON)]
     assert len(login_clicks) >= 2
+
 
 def test_close_emulator_after_signup_when_started_by_us(monkeypatch):
     """开关开启且模拟器由本程序启动 → 完成后自动关闭实例。"""
@@ -389,10 +429,14 @@ def test_close_emulator_after_signup_when_started_by_us(monkeypatch):
     shutdown_calls = []
     device.shutdown_instance = lambda timeout=20: shutdown_calls.append(1)
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={"13800001111": "pw"},
+        location={"latitude": 45, "longitude": 45},
         close_emulator_after=True,
-        on_account=lambda *a: None, on_run=lambda *a: None,
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
     assert flow.run() is True
@@ -405,10 +449,14 @@ def test_no_close_when_switch_off(monkeypatch):
     shutdown_calls = []
     device.shutdown_instance = lambda timeout=20: shutdown_calls.append(1)
     flow = SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={"13800001111": "pw"}, location={"latitude": 45, "longitude": 45},
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={"13800001111": "pw"},
+        location={"latitude": 45, "longitude": 45},
         close_emulator_after=False,
-        on_account=lambda *a: None, on_run=lambda *a: None,
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
     )
     monkeypatch.setattr(signup, "create_device", lambda *a, **k: device)
     assert flow.run() is True
@@ -417,11 +465,16 @@ def test_no_close_when_switch_off(monkeypatch):
 
 # ---------- 「账号已失效」弹窗（首次打开 App 时最多一次） ----------
 
+
 def _bare_flow(**kwargs) -> SignupFlow:
     return SignupFlow(
-        serial="s", emulator_path="C:/MuMu", emulator_num="0",
-        users={}, location={"latitude": 45, "longitude": 45},
-        on_account=lambda *a: None, on_run=lambda *a: None,
+        serial="s",
+        emulator_path="C:/MuMu",
+        emulator_num="0",
+        users={},
+        location={"latitude": 45, "longitude": 45},
+        on_account=lambda *a: None,
+        on_run=lambda *a: None,
         **kwargs,
     )
 
@@ -469,8 +522,8 @@ def test_watcher_started_once_at_app_launch_and_stopped(monkeypatch):
     monkeypatch.setattr(SignupFlow, "_start_expired_watcher", spy)
     assert flow.run() is True
 
-    assert len(starts) == 1                    # App 启动时只开一次
-    assert flow._expired_thread is None        # 流程结束已收口
+    assert len(starts) == 1  # App 启动时只开一次
+    assert flow._expired_thread is None  # 流程结束已收口
 
 
 def test_scroll_up_is_fast_swipe():
@@ -480,6 +533,7 @@ def test_scroll_up_is_fast_swipe():
 
 # ---------- 遮挡弹窗：dump 只返回最上层窗口，底层控件整体"消失" ----------
 
+
 def test_dismiss_popup_clicks_confirm_then_agree():
     """先优先「确定」，没有则退而点「同意并继续」。"""
     transitions = {("click", CONFIRM_BUTTON): goto(LOGIN_BUTTON)}
@@ -487,7 +541,9 @@ def test_dismiss_popup_clicks_confirm_then_agree():
     _bare_flow()._dismiss_popup(device)
     assert ("click", CONFIRM_BUTTON) in device.calls
 
-    agree = ScriptedDevice({AGREE_BUTTON}, {("click", AGREE_BUTTON): goto(LOGIN_BUTTON)})
+    agree = ScriptedDevice(
+        {AGREE_BUTTON}, {("click", AGREE_BUTTON): goto(LOGIN_BUTTON)}
+    )
     _bare_flow()._dismiss_popup(agree)
     assert ("click", AGREE_BUTTON) in agree.calls
 
@@ -495,10 +551,10 @@ def test_dismiss_popup_clicks_confirm_then_agree():
 def test_enter_login_page_clears_blocking_privacy_dialog():
     """服务协议弹窗盖住登录页时 dump 里只有弹窗节点 → 先关弹窗，再找到登录页。"""
     transitions = {("click", AGREE_BUTTON): goto(LOGIN_BUTTON)}
-    device = ScriptedDevice({AGREE_BUTTON}, transitions)   # 只看得见弹窗
+    device = ScriptedDevice({AGREE_BUTTON}, transitions)  # 只看得见弹窗
     flow = _bare_flow()
 
-    flow._enter_login_page(device)          # 不抛异常即为通过
+    flow._enter_login_page(device)  # 不抛异常即为通过
 
     assert ("click", AGREE_BUTTON) in device.calls
     assert LOGIN_BUTTON in device.screen
@@ -514,4 +570,3 @@ def test_enter_login_page_clears_blocking_expired_dialog():
 
     assert ("click", CONFIRM_BUTTON) in device.calls
     assert LOGIN_BUTTON in device.screen
-

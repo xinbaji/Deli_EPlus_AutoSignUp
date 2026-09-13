@@ -6,6 +6,20 @@
 > 本文件自 v1.4.0 起建立；更早版本的变更请看
 > [提交历史](https://github.com/xinbaji/Deli_EPlus_AutoSignUp/commits/main)。
 
+## [未发布]
+
+### 新增
+
+- `LICENSE`：明确 MIT 许可（`pyproject.toml` 里此前只声明了 license 字段）。
+- 静态检查门：引入 **ruff**（lint）、**black**（格式化）、**mypy**（类型检查），
+  已加进 `dev` 依赖，并在 CI 与发版流程里前置执行（不通过则不出包）。
+
+### 修复
+
+- **GUI「停止」按钮失效**：`_StopToken.stopped` 是返回 bool 的 property，却被直接当回调
+  传给 `SignupFlow(stop_check=...)`；构造时它为 `False`，被 `stop_check or (lambda: False)`
+  兜底吞掉，导致停止令牌永远读不到。改为传 `lambda: self._stop_token.stopped`。
+
 ## [1.4.0] - 2026-09-13
 
 ### 新增

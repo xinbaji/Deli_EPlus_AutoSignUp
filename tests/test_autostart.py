@@ -9,8 +9,9 @@ from deli_eplus import autostart
 
 def test_default_off_and_toggle_roundtrip(monkeypatch):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "executable",
-                        r"C:\App\Deli_EPlus_AutoSignUp.exe", raising=False)
+    monkeypatch.setattr(
+        sys, "executable", r"C:\App\Deli_EPlus_AutoSignUp.exe", raising=False
+    )
     try:
         autostart.set_enabled(False)
         assert autostart.is_enabled() is False

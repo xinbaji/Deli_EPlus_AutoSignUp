@@ -63,7 +63,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"   # 含 pytest + pyinstaller
+          pip install -e ".[dev]"   # 含 pytest + pyinstaller + ruff/black/mypy
+
+      - name: Lint & type check
+        shell: bash
+        run: |
+          set -e
+          ruff check .
+          black --check .
+          mypy
 
       - name: Run tests
         shell: pwsh

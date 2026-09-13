@@ -9,10 +9,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
-from typing import Callable, Mapping, Optional
+from collections.abc import Callable, Mapping
 
+from ..config import mask_phone
 from ..device import (
     AndroidDevice,
     AppLaunchError,
@@ -21,7 +23,6 @@ from ..device import (
     StopRequested,
     create_device,
 )
-from ..config import mask_phone
 from ..log import get as get_logger
 
 Package = "com.delicloud.app.smartoffice"
@@ -41,13 +42,15 @@ def _contains(fragment: str) -> str:
 
 
 PHONE_INPUT = f"//android.widget.EditText[@resource-id='{ResourcePrefix}et_phone']"
-PASSWORD_INPUT = f"//android.widget.EditText[@resource-id='{ResourcePrefix}et_password']"
+PASSWORD_INPUT = (
+    f"//android.widget.EditText[@resource-id='{ResourcePrefix}et_password']"
+)
 
-SKIP_AD = _text("跳过")            # 启动广告页
-MINE_TAB = _text("我的")           # 底部导航
+SKIP_AD = _text("跳过")  # 启动广告页
+MINE_TAB = _text("我的")  # 底部导航
 SETTINGS_ITEM = _text("设置")
 LOGOUT_ITEM = _text("退出登录")
-CONFIRM_BUTTON = _text("确定")      # 各类弹窗的确认
+CONFIRM_BUTTON = _text("确定")  # 各类弹窗的确认
 # 会话失效弹窗（首次打开 App 时最多弹一次）：启动后由后台线程盯着，出现即点「确定」
 EXPIRED_HINT = _contains("账号已失效")
 LOGIN_BUTTON = _text("登录")
@@ -60,7 +63,7 @@ OUT_RANGE = _contains("不在打卡")
 GETTING_LOCATION = _contains("正在获取当前位置")
 REFRESH_BUTTON = _text("刷新")
 PUNCH_BUTTON = _text("打卡")
-PUNCH_CONFIRM = "//android.widget.ImageButton"   # 打卡弹出的确认大按钮
+PUNCH_CONFIRM = "//android.widget.ImageButton"  # 打卡弹出的确认大按钮
 
 # 登录页候选：广告(跳过) / 已登录(我的) / 目标(登录)
 LAUNCH_CANDIDATES = (SKIP_AD, MINE_TAB, LOGIN_BUTTON)
@@ -71,8 +74,8 @@ RANGE_CANDIDATES = (IN_RANGE, OUT_RANGE, GETTING_LOCATION)
 SCROLL_UP = (515, 1662, 515, 457, 0.2)
 MAX_SWIPE_ATTEMPTS = 4
 
-ENTER_LOGIN_TIMEOUT = 120   # 从打开 App 到见到登录按钮的总时限
-PUNCH_TIMEOUT = 90          # 等待"已在打卡范围内"的时限
+ENTER_LOGIN_TIMEOUT = 120  # 从打开 App 到见到登录按钮的总时限
+PUNCH_TIMEOUT = 90  # 等待"已在打卡范围内"的时限
 EXPIRED_WATCH_INTERVAL = 0.5  # 失效弹窗监听线程的轮询间隔
 
 
@@ -89,9 +92,9 @@ class SignupFlow:
         location: Mapping[str, float],
         debug: bool = False,
         close_emulator_after: bool = False,
-        on_account: Optional[Callable[[str, str, str], None]] = None,
-        on_run: Optional[Callable[[str, str], None]] = None,
-        stop_check: Optional[Callable[[], bool]] = None,
+        on_account: Callable[[str, str, str], None] | None = None,
+        on_run: Callable[[str, str], None] | None = None,
+        stop_check: Callable[[], bool] | None = None,
     ):
         self._serial = serial
         self._emulator_path = emulator_path
@@ -104,9 +107,11 @@ class SignupFlow:
         self._on_run = on_run or (lambda *a: None)
         self._stop_check = stop_check or (lambda: False)
         self._log = get_logger("signup")
-        self.device = None  # run() 后持有设备对象（供退出时关闭模拟器）
-        self._expired_stop: Optional[threading.Event] = None
-        self._expired_thread: Optional[threading.Thread] = None
+        self.device: AndroidDevice | None = (
+            None  # run() 后持有设备对象（供退出时关闭模拟器）
+        )
+        self._expired_stop: threading.Event | None = None
+        self._expired_thread: threading.Thread | None = None
 
     # ---------- 入口 ----------
 
@@ -115,7 +120,9 @@ class SignupFlow:
         self._emit_run("started", "调试签到" if self._debug else "")
         try:
             device = create_device(
-                self._serial, self._emulator_path, self._emulator_num,
+                self._serial,
+                self._emulator_path,
+                self._emulator_num,
                 logger=get_logger("device"),
             )
             device.set_stop_check(self._stop_check)
@@ -142,16 +149,20 @@ class SignupFlow:
 
             total = len(self._users)
             if failed:
-                self._emit_run("finished", f"本轮结束：{total - failed}/{total} 成功，{failed} 失败")
+                self._emit_run(
+                    "finished",
+                    f"本轮结束：{total - failed}/{total} 成功，{failed} 失败",
+                )
                 return False
             self._emit_run("finished", f"本轮结束：{total}/{total} 全部成功")
             # 开关开启且模拟器由本程序启动时，签到完成后顺手关闭实例
-            if self._close_emulator_after and self.device is not None:
-                if getattr(self.device, "started_by_us", False):
-                    self._log.info("关闭由本程序启动的模拟器实例…")
-                    shutdown = getattr(self.device, "shutdown_instance", None)
-                    if shutdown:
-                        shutdown()
+            if (
+                self._close_emulator_after
+                and self.device is not None
+                and self.device.started_by_us
+            ):
+                self._log.info("关闭由本程序启动的模拟器实例…")
+                self.device.shutdown_instance()
             return True
 
         except StopRequested:
@@ -182,7 +193,7 @@ class SignupFlow:
             device.start_app(Package, timeout=30)
         except AppLaunchError as e:
             # 30 秒没启动成功视为卡死：关闭由本程序启动的模拟器再报错
-            if getattr(device, "started_by_us", False):
+            if device.started_by_us:
                 device.shutdown_instance()
             raise AppLaunchError(f"{e}（已关闭由本程序启动的模拟器实例）") from e
 
@@ -195,7 +206,7 @@ class SignupFlow:
         try:
             while True:
                 self._check_stop()
-                if time.monotonic() > deadline:   # 兜底：反复退出/弹窗时不至于无限循环
+                if time.monotonic() > deadline:  # 兜底：反复退出/弹窗时不至于无限循环
                     raise DeviceError(
                         f"{ENTER_LOGIN_TIMEOUT} 秒内未能进入登录页：请手动确认 App 界面"
                     )
@@ -205,14 +216,15 @@ class SignupFlow:
                     # 轮询窗口跟随剩余预算（避免小预算测试/收尾阶段空转）
                     remaining = max(0.5, min(5.0, deadline - time.monotonic()))
                     index, element = device.wait_any(
-                        LAUNCH_CANDIDATES, timeout=remaining, poll=0.5)
+                        LAUNCH_CANDIDATES, timeout=remaining, poll=0.5
+                    )
                 except ElementTimeoutError:
                     continue
 
-                if index == 0:            # 启动广告
+                if index == 0:  # 启动广告
                     element.click()
                     self._dismiss_popup(device)
-                elif index == 1:          # 已有账号在登录状态，先退出
+                elif index == 1:  # 已有账号在登录状态，先退出
                     self._log.info("检测到已登录账号，正在退出…")
                     try:
                         self._logout(device)
@@ -256,29 +268,25 @@ class SignupFlow:
             self._check_stop()
             try:
                 index, _ = device.wait_any(RANGE_CANDIDATES, timeout=2.0, poll=0.4)
-            except ElementTimeoutError:
+            except ElementTimeoutError as e:
                 if time.monotonic() > deadline:
                     raise DeviceError(
                         f"等待打卡窗口超时（{PUNCH_TIMEOUT} 秒）："
                         "请检查模拟器定位经纬度是否为考勤点附近"
-                    )
+                    ) from e
                 if not reclicked:
                     # 智能考勤点击可能被切换动画吞掉：补点一次
                     reclicked = True
                     self._log.info("考勤页未加载，补点「智能考勤」")
-                    try:
+                    with contextlib.suppress(ElementTimeoutError):
                         device.click(ATTENDANCE_ENTRY, timeout=4)
-                    except ElementTimeoutError:
-                        pass
                 continue
             if index == 0:
-                break                              # 已在打卡范围内/位置内
+                break  # 已在打卡范围内/位置内
             if index == 1:
                 # 不在范围 → 点「刷新」让 App 重新取一次位置
-                try:
+                with contextlib.suppress(ElementTimeoutError):
                     device.click(REFRESH_BUTTON, timeout=2)
-                except ElementTimeoutError:
-                    pass
                 continue
             # index == 2：打卡页停在「正在获取当前位置」。
             # 实测 MuMu 虚拟定位若在 App 发起定位请求前注入会被错过，
@@ -336,7 +344,7 @@ class SignupFlow:
 
     def _tap_logout_confirmed(self, device: AndroidDevice) -> None:
         # 点击可能被吞：以「确定」弹窗出现为准，没弹就再点
-        device.click_until(LOGOUT_ITEM, CONFIRM_BUTTON,timeout=15)
+        device.click_until(LOGOUT_ITEM, CONFIRM_BUTTON, timeout=15)
         device.click(CONFIRM_BUTTON, timeout=6)
         if not device.wait_gone(LOGOUT_ITEM, timeout=10):
             raise DeviceError("确认退出后界面未返回：请人工检查 App 状态")
@@ -370,7 +378,8 @@ class SignupFlow:
                     self._log.debug("失效弹窗探测异常（忽略）: %r", e)
 
         self._expired_thread = threading.Thread(
-            target=watch, name="expired-popup-watch", daemon=True)
+            target=watch, name="expired-popup-watch", daemon=True
+        )
         self._expired_thread.start()
 
     def _stop_expired_watcher(self, timeout: float = 2.0) -> None:

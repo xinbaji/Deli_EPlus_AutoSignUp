@@ -34,11 +34,15 @@ def run_pyinstaller() -> Path:
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
     cmd = [
-        sys.executable, "-m", "PyInstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         str(SPEC),
         "--noconfirm",
-        "--distpath", str(ROOT / "dist"),
-        "--workpath", str(ROOT / "build"),
+        "--distpath",
+        str(ROOT / "dist"),
+        "--workpath",
+        str(ROOT / "build"),
     ]
     print(">>", " ".join(cmd))
     subprocess.run(cmd, check=True, cwd=ROOT)

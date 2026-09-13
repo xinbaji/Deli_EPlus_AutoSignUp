@@ -157,8 +157,9 @@ def test_feed_poller_pushes_batched_items(api, monkeypatch):
     monkeypatch.setattr(api, "_push", lambda t, d: pushed.append((t, d)))
 
     stop = threading.Event()
-    monkeypatch.setattr(webui.threading.Event, "wait",
-                        lambda self, s=None: stop.wait(0.05) or True)
+    monkeypatch.setattr(
+        webui.threading.Event, "wait", lambda self, s=None: stop.wait(0.05) or True
+    )
 
     # 手动跑一轮 poll 逻辑（不启线程，直接构造）
     record = logging.LogRecord("t", logging.INFO, "f", 1, "10:00:00  消息", None, None)
@@ -167,4 +168,3 @@ def test_feed_poller_pushes_batched_items(api, monkeypatch):
     api._push("feed", {"items": [{"message": m, "level": lv} for m, lv in items]})
     assert pushed[0][0] == "feed"
     assert pushed[0][1]["items"][0]["message"] == "10:00:00  消息"
-

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 
 class DeviceError(RuntimeError):
@@ -27,8 +27,12 @@ class ElementTimeoutError(DeviceError):
     保存 selector 与期间最后一次底层错误，方便上层报出精确原因。
     """
 
-    def __init__(self, selectors: Sequence[str], timeout: float,
-                 last_error: Optional[Exception] = None):
+    def __init__(
+        self,
+        selectors: Sequence[str],
+        timeout: float,
+        last_error: Exception | None = None,
+    ):
         shown = selectors[0] if len(selectors) == 1 else f"{len(selectors)} 个候选之一"
         message = f"等待元素超时（{timeout:g} 秒）：{shown}"
         if last_error is not None:

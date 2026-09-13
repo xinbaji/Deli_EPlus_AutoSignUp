@@ -107,6 +107,7 @@ def device(store):
 
 # ---------- find / 等待语义 ----------
 
+
 def test_find_returns_immediately_when_present(device, store):
     store.visible.add(SEL_A)
     element = device.find(SEL_A, timeout=0.5)
@@ -161,8 +162,9 @@ def test_wait_any_timeout_lists_candidates(device, store):
 
 # ---------- click_until（点源→立刻查 until，循环到超时） ----------
 
+
 def test_click_until_clicks_source_then_returns_when_until_appears(device, store):
-    store.visible.add(SEL_A)              # 源在，until 稍后出现
+    store.visible.add(SEL_A)  # 源在，until 稍后出现
 
     def appear_later():
         threading.Event().wait(0.25)
@@ -171,11 +173,11 @@ def test_click_until_clicks_source_then_returns_when_until_appears(device, store
     threading.Thread(target=appear_later, daemon=True).start()
     element = device.click_until(SEL_A, SEL_B, timeout=3, poll=0.2)
     assert element.selector == SEL_B
-    assert SEL_A in store.clicks          # 先点了源
+    assert SEL_A in store.clicks  # 先点了源
 
 
 def test_click_until_reclicks_source_while_until_absent(device, store):
-    store.visible.add(SEL_A)              # 源一直在，until 永不出现
+    store.visible.add(SEL_A)  # 源一直在，until 永不出现
     with pytest.raises(DeviceError) as exc:
         device.click_until(SEL_A, SEL_B, timeout=0.6, poll=0.1)
     assert SEL_B in str(exc.value)
@@ -190,7 +192,7 @@ def test_click_until_keeps_polling_until_when_source_absent(device, store):
     threading.Thread(target=appear_later, daemon=True).start()
     element = device.click_until(SEL_A, SEL_B, timeout=3, poll=0.2)
     assert element.selector == SEL_B
-    assert store.clicks == []             # 源从未出现 → 不该点击
+    assert store.clicks == []  # 源从未出现 → 不该点击
 
 
 def test_click_until_timeout_reports_until_and_no_source(device, store):
@@ -209,6 +211,7 @@ def test_click_until_respects_stop_token(device, store):
 
 
 # ---------- 动作 ----------
+
 
 def test_click_actuates_and_is_visible_in_store(device, store):
     store.visible.add(SEL_A)
@@ -248,6 +251,7 @@ def test_wait_gone_true_and_false(device, store):
 
 # ---------- 应用启动 ----------
 
+
 def test_start_app_success(device, store):
     device.start_app("com.example", timeout=5)
     assert store.started == ["com.example"]
@@ -270,6 +274,7 @@ def test_start_app_transient_retries_then_timeout(device, store):
 
 
 # ---------- 连接 ----------
+
 
 def test_connect_timeout_raises(monkeypatch):
     import deli_eplus.device.base as base_mod

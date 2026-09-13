@@ -16,8 +16,8 @@ import re
 import subprocess
 import time
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 REPO = "xinbaji/Deli_EPlus_AutoSignUp"
 ASSET_NAME = "Deli_EPlus_AutoSignUp_portable.zip"
@@ -27,8 +27,8 @@ TIMEOUT_DOWNLOAD = 30
 
 # 候选源（顺序即默认回退顺序）：前缀 + 固定 API 地址
 _API_PREFIXES = [
-    ("github", ""),                                    # 直连 api.github.com
-    ("mirror", "https://api.gitproxy.dev/"),           # 实测最快且 API 可反代
+    ("github", ""),  # 直连 api.github.com
+    ("mirror", "https://api.gitproxy.dev/"),  # 实测最快且 API 可反代
     ("mirror2", "https://gh-proxy.com/"),
     ("mirror3", "https://ghproxy.net/"),
     ("mirror4", "https://ghproxy.cn/"),
@@ -36,8 +36,13 @@ _API_PREFIXES = [
 _API_BASE = f"https://api.github.com/repos/{REPO}/releases/latest"
 _DOWNLOAD_TEMPLATE = "https://github.com/{repo}/releases/download/{tag}/{asset}"
 # 下载候选顺序：gitproxy.dev 实测最快且稳定，直连作最后兜底
-_MIRROR_PREFIXES = ["https://api.gitproxy.dev/", "https://gh-proxy.com/",
-                    "https://ghproxy.net/", "https://ghproxy.cn/", ""]
+_MIRROR_PREFIXES = [
+    "https://api.gitproxy.dev/",
+    "https://gh-proxy.com/",
+    "https://ghproxy.net/",
+    "https://ghproxy.cn/",
+    "",
+]
 
 
 def normalize_source(source: str) -> str:
@@ -46,7 +51,7 @@ def normalize_source(source: str) -> str:
 
 def _ordered(prefixes: list[str], preferred: str) -> list[str]:
     """把用户选的源排到最前，其余作为自动回退。"""
-    preferred_prefix = ("https://api.gitproxy.dev/" if preferred == "mirror" else "")
+    preferred_prefix = "https://api.gitproxy.dev/" if preferred == "mirror" else ""
     ordered = [p for p in prefixes if p == preferred_prefix]
     ordered += [p for p in prefixes if p != preferred_prefix]
     return ordered
@@ -58,7 +63,9 @@ def _fetch_json(url: str, timeout: float) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
-def latest_release(preferred: str = "github", timeout: float = TIMEOUT_API) -> Optional[dict]:
+def latest_release(
+    preferred: str = "github", timeout: float = TIMEOUT_API
+) -> dict | None:
     """查询最新 release。返回 {"tag","notes","asset_urls"}；无 release 返回 None。
 
     按 preferred 优先的顺序尝试所有源。URL 带时间戳穿透镜像 CDN 缓存
@@ -66,7 +73,7 @@ def latest_release(preferred: str = "github", timeout: float = TIMEOUT_API) -> O
     """
     preferred = normalize_source(preferred)
     bust = str(int(time.time()))
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
     for prefix in _ordered([p for _, p in _API_PREFIXES], preferred):
         try:
             data = _fetch_json(f"{prefix}{_API_BASE}?t={bust}", timeout)
@@ -96,11 +103,12 @@ def is_newer(remote: str, local: str) -> bool:
     return parse_version(remote) > parse_version(local)
 
 
-def download(urls: list[str], dest: Path,
-             progress: Optional[Callable[[int], None]] = None) -> Path:
+def download(
+    urls: list[str], dest: Path, progress: Callable[[int], None] | None = None
+) -> Path:
     """按候选地址顺序流式下载到 dest，失败自动换下一个源。"""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
     for url in urls:
         try:
             request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -144,6 +152,9 @@ start "" "{app_dir / exe_name}"
 del "%~f0"
 """
     bat.write_text(script, encoding="ascii", errors="ignore")
-    subprocess.Popen(["cmd", "/c", str(bat)], cwd=str(app_dir),
-                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    subprocess.Popen(
+        ["cmd", "/c", str(bat)],
+        cwd=str(app_dir),
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     return bat

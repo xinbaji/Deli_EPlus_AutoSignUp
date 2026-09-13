@@ -21,6 +21,9 @@ Issues = "https://github.com/xinbaji/Deli_EPlus_AutoSignUp/issues"
 dev = [
     "pytest>=8.0",
     "pyinstaller>=6.21",
+    "ruff>=0.6",
+    "black>=24.0",
+    "mypy>=1.11",
 ]
 
 [project.scripts]
@@ -38,3 +41,26 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM"]
+# 行长由 black 负责；BLE001（宽 except）在本项目是刻意的容错边界
+ignore = ["E501"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+show_error_codes = true
+
+# 第三方库无类型标注（uiautomator2 / adbutils 未提供 py.typed）
+[[tool.mypy.overrides]]
+module = ["adbutils.*", "uiautomator2.*"]
+ignore_missing_imports = true

@@ -55,7 +55,9 @@ def _probe(cls, method: str, kind: str, *, selector_first: bool = True) -> None:
     original = getattr(cls, method)
 
     def wrapper(self, *args, **kwargs):
-        selector = (args[0] if args else kwargs.get("selector")) if selector_first else None
+        selector = (
+            (args[0] if args else kwargs.get("selector")) if selector_first else None
+        )
         _record(kind, "start", selector)
         try:
             return original(self, *args, **kwargs)
@@ -87,8 +89,15 @@ def _probe_logout_loginpage() -> None:
 
 
 def _install_probes() -> None:
-    for method in ("find", "exists", "wait_any", "wait_gone",
-                   "click", "click_until", "type_text"):
+    for method in (
+        "find",
+        "exists",
+        "wait_any",
+        "wait_gone",
+        "click",
+        "click_until",
+        "type_text",
+    ):
         _probe(AndroidDevice, method, method)
     _probe(AndroidDevice, "start_app", "start_app", selector_first=False)
     _probe(MuMuDevice, "start_emulator", "start_emulator", selector_first=False)
@@ -96,12 +105,17 @@ def _install_probes() -> None:
     _probe_logout_loginpage()
 
 
-def _at(kind: str, selector: str | None, phase: str = "start",
-        after: float | None = None) -> float | None:
+def _at(
+    kind: str, selector: str | None, phase: str = "start", after: float | None = None
+) -> float | None:
     for t, k, p, sel in EVENTS:
-        if k == kind and sel == selector and p == phase:
-            if after is None or t >= after:
-                return t
+        if (
+            k == kind
+            and sel == selector
+            and p == phase
+            and (after is None or t >= after)
+        ):
+            return t
     return None
 
 
@@ -144,10 +158,14 @@ def _report(ok: bool, total: float, final_login_visible: bool | None) -> None:
     # 一律锚定在「点智能考勤之后」，避免取到登录前那次登出。
     t_mine_click = _at("click_until", MINE_TAB, "start", after=t_attendance_end or 0.0)
     add("⑦ 点智能考勤 → 开始登出(含打卡)", _diff(t_mine_click, t_attendance_end))
-    add("  ·打卡：点打卡 → 确认弹窗",
-        _span("click_until", PUNCH_BUTTON, after=t_attendance_end or 0.0))
-    add("⑧ 点我的 → 出现设置项",
-        _span("click_until", MINE_TAB, after=t_attendance_end or 0.0))
+    add(
+        "  ·打卡：点打卡 → 确认弹窗",
+        _span("click_until", PUNCH_BUTTON, after=t_attendance_end or 0.0),
+    )
+    add(
+        "⑧ 点我的 → 出现设置项",
+        _span("click_until", MINE_TAB, after=t_attendance_end or 0.0),
+    )
 
     t_settings = _at("click", SETTINGS_ITEM, "start", after=t_attendance_end or 0.0)
     t_logout_done = _at("wait_gone", LOGOUT_ITEM, "end")
@@ -163,8 +181,10 @@ def _report(ok: bool, total: float, final_login_visible: bool | None) -> None:
     for name, seconds in rows:
         lines.append(f"{name:<32} {_fmt(seconds):>10}")
     lines.append("=" * 50)
-    lines.append(f"流程结果: {'成功' if ok else '失败/中止'}"
-                 f"   结束时登录页可见: {final_login_visible}")
+    lines.append(
+        f"流程结果: {'成功' if ok else '失败/中止'}"
+        f"   结束时登录页可见: {final_login_visible}"
+    )
     text = "\n".join(lines)
     log.info("\n%s", text)
     print(text, flush=True)
@@ -177,19 +197,33 @@ def _report(ok: bool, total: float, final_login_visible: bool | None) -> None:
     events_path = out_dir / f"timing-{stamp}.json"
     events_path.write_text(
         json.dumps(
-            [{"t": round(t - PROCESS_START, 3), "method": k, "phase": p, "selector": s}
-             for t, k, p, s in EVENTS],
-            ensure_ascii=False, indent=1),
-        encoding="utf-8")
+            [
+                {
+                    "t": round(t - PROCESS_START, 3),
+                    "method": k,
+                    "phase": p,
+                    "selector": s,
+                }
+                for t, k, p, s in EVENTS
+            ],
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
     print(f"\n明细已写入:\n  {report_path}\n  {events_path}", flush=True)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="得力E+ 真机签到计时")
-    parser.add_argument("--shutdown", action="store_true",
-                        help="结束后关闭由本程序启动的模拟器实例")
-    parser.add_argument("--real-punch", action="store_true",
-                        help="实际执行打卡（默认 debug，只走到打卡窗口）")
+    parser.add_argument(
+        "--shutdown", action="store_true", help="结束后关闭由本程序启动的模拟器实例"
+    )
+    parser.add_argument(
+        "--real-punch",
+        action="store_true",
+        help="实际执行打卡（默认 debug，只走到打卡窗口）",
+    )
     args = parser.parse_args()
 
     config_path = PROJECT_ROOT / "config.json"
@@ -202,9 +236,14 @@ def main() -> int:
         return 2
 
     log = get_logger("timing")
-    log.info("计时开始：serial=%s  实例=%s  路径=%s  打卡点=%s  打卡=%s",
-             cfg.serial, cfg.emulator_num, cfg.emulator_path, cfg.location,
-             "实际" if args.real_punch else "debug(跳过)")
+    log.info(
+        "计时开始：serial=%s  实例=%s  路径=%s  打卡点=%s  打卡=%s",
+        cfg.serial,
+        cfg.emulator_num,
+        cfg.emulator_path,
+        cfg.location,
+        "实际" if args.real_punch else "debug(跳过)",
+    )
 
     _install_probes()
 

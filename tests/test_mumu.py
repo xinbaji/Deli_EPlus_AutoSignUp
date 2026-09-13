@@ -49,10 +49,13 @@ def test_start_emulator_launches_process_and_connects(device, mumu_dir, monkeypa
 
     launched = {}
     monkeypatch.setattr("deli_eplus.device.mumu.subprocess.Popen", fake_popen)
-    monkeypatch.setattr("deli_eplus.device.mumu.subprocess.run",
-                        lambda cmd, **kw: types.SimpleNamespace(
-                            stdout=b'{"is_process_started": false, "is_android_started": true}',
-                            stderr=b""))
+    monkeypatch.setattr(
+        "deli_eplus.device.mumu.subprocess.run",
+        lambda cmd, **kw: types.SimpleNamespace(
+            stdout=b'{"is_process_started": false, "is_android_started": true}',
+            stderr=b"",
+        ),
+    )
     monkeypatch.setattr(device, "connect", lambda timeout=180: None)
     device.start_emulator(timeout=1)
     assert launched["cmd"][0].endswith("MuMuManager.exe")
@@ -84,6 +87,7 @@ def test_set_location_errcode_nonzero_raises(device, monkeypatch):
 
 def test_set_location_spacing_variant_json(device, monkeypatch):
     """旧版输出 errcode 后可能没有空格，也必须识别成功。"""
+
     def fake_run(cmd, **kwargs):
         return subprocess.CompletedProcess(cmd, 0, stdout='{"errcode":0}\n', stderr="")
 
@@ -127,6 +131,7 @@ def test_parse_json_object_multiline():
 def test_parse_manager_output_variants():
     assert MuMuDevice._parse_manager_output('{"errcode": 0}') == {"errcode": 0}
     assert MuMuDevice._parse_manager_output('log line\n{"errcode": 5, "msg": "x"}') == {
-        "errcode": 5, "msg": "x"
+        "errcode": 5,
+        "msg": "x",
     }
     assert MuMuDevice._parse_manager_output("no json here") is None

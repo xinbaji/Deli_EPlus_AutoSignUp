@@ -65,8 +65,18 @@ def fuzzy_hit(xml: str, needle: str, mode: str) -> str | None:
 
 def main() -> int:
     cfg = Config(PROJECT_ROOT / "config.json")
-    stat = {label: dict(samples=0, strict=0, fuzzy=0, miss=0, first=None, last=None, classes=set())
-            for label, _, _, _ in WATCH}
+    stat = {
+        label: {
+            "samples": 0,
+            "strict": 0,
+            "fuzzy": 0,
+            "miss": 0,
+            "first": None,
+            "last": None,
+            "classes": set(),
+        }
+        for label, _, _, _ in WATCH
+    }
     stop = threading.Event()
     samples = {"n": 0}
     t0 = time.monotonic()
@@ -103,9 +113,15 @@ def main() -> int:
             time.sleep(0.1)
 
     from deli_eplus.core.signup import SignupFlow
+
     flow = SignupFlow(
-        serial=cfg.serial, emulator_path=cfg.emulator_path, emulator_num=cfg.emulator_num,
-        users=cfg.users, location=cfg.location, debug=True, close_emulator_after=False,
+        serial=cfg.serial,
+        emulator_path=cfg.emulator_path,
+        emulator_num=cfg.emulator_num,
+        users=cfg.users,
+        location=cfg.location,
+        debug=True,
+        close_emulator_after=False,
         on_run=lambda s, m: print(f"[运行] {s} {m}", flush=True),
     )
     thread = threading.Thread(target=sampler, daemon=True)
@@ -116,14 +132,18 @@ def main() -> int:
 
     print(f"\n流程结果: {ok} | 采样轮数: {samples['n']}")
     print("=" * 92)
-    print(f"{'选择器':<20}{'strict':>8}{'fuzzy':>8}{'漏检':>7}  首次/最后(s)      命中节点 class")
+    print(
+        f"{'选择器':<20}{'strict':>8}{'fuzzy':>8}{'漏检':>7}  首次/最后(s)      命中节点 class"
+    )
     print("-" * 92)
     for label, _, _, _ in WATCH:
         st = stat[label]
         span = "-" if st["first"] is None else f"{st['first']:.2f}/{st['last']:.2f}"
         cls = ",".join(sorted(st["classes"])) if st["classes"] else "-"
         flag = "  <<< 漏检" if st["miss"] else ""
-        print(f"{label:<20}{st['strict']:>8}{st['fuzzy']:>8}{st['miss']:>7}  {span:<16} {cls}{flag}")
+        print(
+            f"{label:<20}{st['strict']:>8}{st['fuzzy']:>8}{st['miss']:>7}  {span:<16} {cls}{flag}"
+        )
     print("=" * 92)
     return 0 if ok else 1
 

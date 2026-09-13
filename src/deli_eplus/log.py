@@ -15,7 +15,7 @@ import queue
 import sys
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import cast
 
 from .config import base_dir
 
@@ -25,7 +25,7 @@ logging.addLevelName(SUCCESS, "SUCCESS")
 _ROOT = "deli_eplus"
 _lock = threading.Lock()
 _configured = False
-_feed: Optional["ActivityFeedHandler"] = None
+_feed: ActivityFeedHandler | None = None
 
 
 class ActivityFeedHandler(logging.Handler):
@@ -107,13 +107,21 @@ def setup(console_level: int = logging.INFO, file_level: int = logging.DEBUG) ->
         _configured = True
 
 
-def get(name: str) -> logging.Logger:
+class SuccessLogger(logging.Logger):
+    """带 success() 级别的 Logger（级别 25，介于 INFO 与 WARNING 之间）。"""
+
+    def success(self, message: str, *args: object) -> None:
+        if self.isEnabledFor(SUCCESS):
+            self._log(SUCCESS, message, args)
+
+
+def get(name: str) -> SuccessLogger:
     """获取模块 logger；首次调用会自动完成初始化。"""
     setup()
-    return logging.getLogger(f"{_ROOT}.{name}")
+    return cast(SuccessLogger, logging.getLogger(f"{_ROOT}.{name}"))
 
 
-def feed() -> Optional[ActivityFeedHandler]:
+def feed() -> ActivityFeedHandler | None:
     """UI 用来轮询的活动流 handler；setup 之后才非空。"""
     setup()
     return _feed

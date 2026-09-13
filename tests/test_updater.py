@@ -28,11 +28,16 @@ def test_normalize_source():
 
 
 class _FakeResponse:
-    def __init__(self, payload: bytes = b"", headers: dict | None = None,
-                 chunks: list[bytes] | None = None):
+    def __init__(
+        self,
+        payload: bytes = b"",
+        headers: dict | None = None,
+        chunks: list[bytes] | None = None,
+    ):
         self.headers = headers or {}
-        self._chunks = chunks if chunks is not None else (
-            [self._payload] if self._payload else [])
+        self._chunks = (
+            chunks if chunks is not None else ([self._payload] if self._payload else [])
+        )
 
     def __enter__(self):
         return self
@@ -60,8 +65,7 @@ def test_latest_release_github(monkeypatch):
     assert "?t=" in captured["url"]  # cache-buster
     # 回退链：gitproxy.dev 在前（实测最快），直连 github 兜底
     assert info["asset_urls"][0].startswith("https://api.gitproxy.dev/")
-    assert info["asset_urls"][0].endswith(
-        f"v1.2.3/{updater.ASSET_NAME}")
+    assert info["asset_urls"][0].endswith(f"v1.2.3/{updater.ASSET_NAME}")
     assert info["asset_urls"][-1].startswith("https://github.com/")
 
 
@@ -103,8 +107,7 @@ def test_latest_release_all_sources_down(monkeypatch):
 
 
 def test_latest_release_no_release_yet(monkeypatch):
-    monkeypatch.setattr(updater, "_fetch_json",
-                        lambda url, timeout: {"tag_name": ""})
+    monkeypatch.setattr(updater, "_fetch_json", lambda url, timeout: {"tag_name": ""})
     assert updater.latest_release("github") is None
 
 
@@ -114,16 +117,17 @@ def test_download_falls_back_to_next_url(tmp_path, monkeypatch):
 
     def fake_urlopen(request, timeout=None):
         if request.full_url.startswith("https://github.com/"):
-            raise OSError("timeout")   # 直连失败
-        return _FakeResponse(headers={"Content-Length": "6"},
-                             chunks=[b"123456"])
+            raise OSError("timeout")  # 直连失败
+        return _FakeResponse(headers={"Content-Length": "6"}, chunks=[b"123456"])
 
     monkeypatch.setattr(updater.urllib.request, "urlopen", fake_urlopen)
 
     percents = []
     out = updater.download(
         ["https://github.com/x.zip", "https://gh-proxy.com/https://github.com/x.zip"],
-        dest, progress=percents.append)
+        dest,
+        progress=percents.append,
+    )
     assert out == dest
     assert dest.read_bytes() == b"123456"
     assert percents[-1] == 100
@@ -147,9 +151,11 @@ def test_apply_update_writes_bat(tmp_path, monkeypatch):
     zip_path.write_bytes(b"z")
     launched = {}
     monkey = pytest.MonkeyPatch()
-    monkey.setattr(updater.subprocess, "Popen",
-                   lambda cmd, cwd=None, creationflags=0: launched.setdefault(
-                       "cmd", cmd))
+    monkey.setattr(
+        updater.subprocess,
+        "Popen",
+        lambda cmd, cwd=None, creationflags=0: launched.setdefault("cmd", cmd),
+    )
     try:
         bat = updater.apply_update(zip_path, tmp_path, "Deli_EPlus_AutoSignUp.exe")
     finally:

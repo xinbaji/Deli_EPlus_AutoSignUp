@@ -138,6 +138,7 @@ def test_concurrent_saves_keep_file_valid(config: Config):
     reloaded = Config(path=config.path)
     assert len(reloaded.users) == 80
 
+
 def test_download_source_defaults_and_setting(config: Config):
     """默认国内镜像；仅显式 github 才走 github。"""
     assert config.download_source == "mirror"
@@ -152,4 +153,3 @@ def test_close_emulator_after_default_and_set(config: Config):
     config.set_close_emulator_after(True)
     config.save()
     assert Config(path=config.path).close_emulator_after is True
-

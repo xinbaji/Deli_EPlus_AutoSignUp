@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import subprocess
 import time
-from typing import Optional
 from pathlib import Path
 
 from .base import AndroidDevice
@@ -35,26 +34,25 @@ class MuMuDevice(AndroidDevice):
         self.instance = str(instance)
         self.manager_exe = self.emulator_path / MANAGER_NAME
         self.emulator_exe = self.emulator_path / MAIN_NAME
-        self.started_by_us = False   # 模拟器是否由本程序拉起（决定退出时是否关闭它）
+        self.started_by_us = False  # 模拟器是否由本程序拉起（决定退出时是否关闭它）
 
     # ---------- 模拟器进程 ----------
-
 
     def _manager(self, args: list[str], timeout: float = 30) -> str:
         """执行 MuMuManager 子命令，返回合并输出（GBK 解码）。"""
         result = subprocess.run(
             [str(self.manager_exe), *args],
-            capture_output=True, timeout=timeout,
+            capture_output=True,
+            timeout=timeout,
             creationflags=_NO_WINDOW,
         )
         stdout = (result.stdout or b"").decode("gbk", errors="ignore")
         stderr = (result.stderr or b"").decode("gbk", errors="ignore")
         return stdout + stderr
 
-    def get_instance_info(self) -> Optional[dict]:
+    def get_instance_info(self) -> dict | None:
         """官方 `info -v <index>`：实例信息 JSON（含 is_android_started 等）。"""
-        return self._parse_json_object(
-            self._manager(["info", "-v", self.instance]))
+        return self._parse_json_object(self._manager(["info", "-v", self.instance]))
 
     def launch_instance(self) -> None:
         """官方 `control -v <index> launch`：启动实例（已在运行时安全）。
@@ -92,8 +90,8 @@ class MuMuDevice(AndroidDevice):
             self._check_stop()
             self._log.info("等待上一次模拟器实例完全退出…")
             time.sleep(3)
-        info = self.get_instance_info() or {}
-        self.started_by_us = not info.get("is_process_started", False)
+        current = self.get_instance_info() or {}
+        self.started_by_us = not current.get("is_process_started", False)
 
         self._log.info("启动模拟器（官方 control launch，实例 %s）…", self.instance)
         self.launch_instance()
@@ -105,16 +103,18 @@ class MuMuDevice(AndroidDevice):
                 self._check_stop()
                 info = self.get_instance_info()
                 if info and info.get("is_android_started"):
-                    self._log.info("模拟器安卓已启动（%.1f 秒）",
-                                   time.monotonic() - started_at)
+                    self._log.info(
+                        "模拟器安卓已启动（%.1f 秒）", time.monotonic() - started_at
+                    )
                     break
                 if time.monotonic() >= deadline:
-                    raise DeviceError(
-                        f"模拟器 {timeout:g} 秒内未完成安卓启动"
-                    )
+                    raise DeviceError(f"模拟器 {timeout:g} 秒内未完成安卓启动")
                 state = str((info or {}).get("player_state") or "启动中")
-                self._log.info("等待模拟器安卓启动…（%.0fs，状态: %s）",
-                               time.monotonic() - started_at, state)
+                self._log.info(
+                    "等待模拟器安卓启动…（%.0fs，状态: %s）",
+                    time.monotonic() - started_at,
+                    state,
+                )
                 time.sleep(2)
 
             # 阶段 2：ADB/uiautomator 连接
@@ -132,7 +132,8 @@ class MuMuDevice(AndroidDevice):
         try:
             subprocess.run(
                 [str(self.manager_exe), "control", "-v", self.instance, "shutdown"],
-                capture_output=True, timeout=timeout,
+                capture_output=True,
+                timeout=timeout,
                 creationflags=_NO_WINDOW,
             )
         except (OSError, subprocess.TimeoutExpired) as e:
@@ -142,7 +143,9 @@ class MuMuDevice(AndroidDevice):
 
     # ---------- 虚拟定位 ----------
 
-    def set_location(self, latitude: float, longitude: float, timeout: float = 15) -> None:
+    def set_location(
+        self, latitude: float, longitude: float, timeout: float = 15
+    ) -> None:
         self._check_stop()
         if not self.manager_exe.is_file():
             raise LocationError(
@@ -150,10 +153,15 @@ class MuMuDevice(AndroidDevice):
             )
         command = [
             str(self.manager_exe),
-            "control", "-v", self.instance,
-            "tool", "location",
-            "-lon", str(longitude),
-            "-lat", str(latitude),
+            "control",
+            "-v",
+            self.instance,
+            "tool",
+            "location",
+            "-lon",
+            str(longitude),
+            "-lat",
+            str(latitude),
         ]
         self._log.info("执行定位命令: %s", " ".join(command))
         try:
@@ -176,7 +184,9 @@ class MuMuDevice(AndroidDevice):
         if payload is None:
             # 极老版本 MuMuManager 无 JSON 输出，只能靠返回码
             if result.returncode == 0:
-                self._log.info("虚拟位置已设置（旧版无 JSON 输出）: %s, %s", latitude, longitude)
+                self._log.info(
+                    "虚拟位置已设置（旧版无 JSON 输出）: %s, %s", latitude, longitude
+                )
                 return
             raise LocationError(
                 f"设置虚拟位置失败（返回码 {result.returncode}）: {output.strip()[:200]}"
@@ -190,7 +200,7 @@ class MuMuDevice(AndroidDevice):
         )
 
     @staticmethod
-    def _parse_json_object(text: str) -> Optional[dict]:
+    def _parse_json_object(text: str) -> dict | None:
         """解析输出里的 JSON 对象。
 
         MuMuManager 的 info 输出是多行美化 JSON，必须先整段解析；
@@ -209,7 +219,7 @@ class MuMuDevice(AndroidDevice):
             if "{" not in line:
                 continue
             try:
-                data = json.loads(line[line.index("{"): line.rindex("}") + 1])
+                data = json.loads(line[line.index("{") : line.rindex("}") + 1])
             except (ValueError, IndexError):
                 continue
             if isinstance(data, dict):
@@ -217,14 +227,14 @@ class MuMuDevice(AndroidDevice):
         return None
 
     @staticmethod
-    def _parse_manager_output(text: str) -> Optional[dict]:
+    def _parse_manager_output(text: str) -> dict | None:
         """MuMuManager 输出里找包含 errcode 的 JSON 对象（逐行尝试）。"""
         for line in text.splitlines():
             line = line.strip()
             if "{" not in line:
                 continue
             try:
-                data = json.loads(line[line.index("{"): line.rindex("}") + 1])
+                data = json.loads(line[line.index("{") : line.rindex("}") + 1])
             except (ValueError, IndexError):
                 continue
             if isinstance(data, dict) and "errcode" in data:
