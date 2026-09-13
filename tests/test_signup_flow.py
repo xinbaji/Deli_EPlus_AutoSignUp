@@ -414,3 +414,104 @@ def test_no_close_when_switch_off(monkeypatch):
     assert flow.run() is True
     assert shutdown_calls == []
 
+
+# ---------- 「账号已失效」弹窗（首次打开 App 时最多一次） ----------
+
+def _bare_flow(**kwargs) -> SignupFlow:
+    return SignupFlow(
+        serial="s", emulator_path="C:/MuMu", emulator_num="0",
+        users={}, location={"latitude": 45, "longitude": 45},
+        on_account=lambda *a: None, on_run=lambda *a: None,
+        **kwargs,
+    )
+
+
+def test_expired_popup_watcher_dismisses_dialog(monkeypatch):
+    """后台线程盯失效弹窗：出现即点「确定」，点到即收工。"""
+    monkeypatch.setattr(signup, "EXPIRED_WATCH_INTERVAL", 0.01)
+    transitions = {("click", CONFIRM_BUTTON): goto(LOGIN_BUTTON)}
+    device = ScriptedDevice({signup.EXPIRED_HINT, CONFIRM_BUTTON}, transitions)
+    flow = _bare_flow()
+
+    flow._start_expired_watcher(device)
+    thread = flow._expired_thread
+    thread.join(2.0)
+
+    assert ("click", CONFIRM_BUTTON) in device.calls
+    assert not thread.is_alive()
+    flow._stop_expired_watcher()
+
+
+def test_enter_login_page_recovers_from_blocking_expired_dialog():
+    """点「我的」后弹失效弹窗、「设置」永不出现 → 不中止整轮，关弹窗回登录页。"""
+    transitions = {
+        ("click", MINE_TAB): goto(signup.EXPIRED_HINT, CONFIRM_BUTTON),
+        ("click", CONFIRM_BUTTON): goto(LOGIN_BUTTON),
+    }
+    device = ScriptedDevice({MINE_TAB}, transitions)
+    flow = _bare_flow()
+
+    flow._enter_login_page(device)  # 不抛异常即为通过
+
+    assert ("click", CONFIRM_BUTTON) in device.calls
+    assert LOGIN_BUTTON in device.screen
+
+
+def test_watcher_started_once_at_app_launch_and_stopped(monkeypatch):
+    device, flow, _, _ = make_flow(monkeypatch, set(LOGIN_PAGE), punch_transitions())
+    starts: list = []
+    real = SignupFlow._start_expired_watcher  # noqa: SLF001
+
+    def spy(self, dev):
+        starts.append(dev)
+        return real(self, dev)
+
+    monkeypatch.setattr(SignupFlow, "_start_expired_watcher", spy)
+    assert flow.run() is True
+
+    assert len(starts) == 1                    # App 启动时只开一次
+    assert flow._expired_thread is None        # 流程结束已收口
+
+
+def test_scroll_up_is_fast_swipe():
+    """设置页上滑 0.2s（快滑，避免被识别成拖拽）。"""
+    assert signup.SCROLL_UP[-1] == 0.2
+
+
+# ---------- 遮挡弹窗：dump 只返回最上层窗口，底层控件整体"消失" ----------
+
+def test_dismiss_popup_clicks_confirm_then_agree():
+    """先优先「确定」，没有则退而点「同意并继续」。"""
+    transitions = {("click", CONFIRM_BUTTON): goto(LOGIN_BUTTON)}
+    device = ScriptedDevice({CONFIRM_BUTTON}, transitions)
+    _bare_flow()._dismiss_popup(device)
+    assert ("click", CONFIRM_BUTTON) in device.calls
+
+    agree = ScriptedDevice({AGREE_BUTTON}, {("click", AGREE_BUTTON): goto(LOGIN_BUTTON)})
+    _bare_flow()._dismiss_popup(agree)
+    assert ("click", AGREE_BUTTON) in agree.calls
+
+
+def test_enter_login_page_clears_blocking_privacy_dialog():
+    """服务协议弹窗盖住登录页时 dump 里只有弹窗节点 → 先关弹窗，再找到登录页。"""
+    transitions = {("click", AGREE_BUTTON): goto(LOGIN_BUTTON)}
+    device = ScriptedDevice({AGREE_BUTTON}, transitions)   # 只看得见弹窗
+    flow = _bare_flow()
+
+    flow._enter_login_page(device)          # 不抛异常即为通过
+
+    assert ("click", AGREE_BUTTON) in device.calls
+    assert LOGIN_BUTTON in device.screen
+
+
+def test_enter_login_page_clears_blocking_expired_dialog():
+    """失效弹窗盖住登录页（dump 只剩弹窗）→ 先关弹窗，再找到登录页。"""
+    transitions = {("click", CONFIRM_BUTTON): goto(LOGIN_BUTTON)}
+    device = ScriptedDevice({signup.EXPIRED_HINT, CONFIRM_BUTTON}, transitions)
+    flow = _bare_flow()
+
+    flow._enter_login_page(device)
+
+    assert ("click", CONFIRM_BUTTON) in device.calls
+    assert LOGIN_BUTTON in device.screen
+

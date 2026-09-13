@@ -16,6 +16,7 @@ from deli_eplus.device.base import AndroidDevice
 from deli_eplus.device.exceptions import (
     AppLaunchError,
     DeviceConnectionError,
+    DeviceError,
     ElementTimeoutError,
     StopRequested,
 )
@@ -156,6 +157,55 @@ def test_wait_any_returns_first_candidate(device, store):
 def test_wait_any_timeout_lists_candidates(device, store):
     with pytest.raises(ElementTimeoutError):
         device.wait_any([SEL_A, SEL_B], timeout=0.2, poll=0.05)
+
+
+# ---------- click_until（点源→立刻查 until，循环到超时） ----------
+
+def test_click_until_clicks_source_then_returns_when_until_appears(device, store):
+    store.visible.add(SEL_A)              # 源在，until 稍后出现
+
+    def appear_later():
+        threading.Event().wait(0.25)
+        store.visible.add(SEL_B)
+
+    threading.Thread(target=appear_later, daemon=True).start()
+    element = device.click_until(SEL_A, SEL_B, timeout=3, poll=0.2)
+    assert element.selector == SEL_B
+    assert SEL_A in store.clicks          # 先点了源
+
+
+def test_click_until_reclicks_source_while_until_absent(device, store):
+    store.visible.add(SEL_A)              # 源一直在，until 永不出现
+    with pytest.raises(DeviceError) as exc:
+        device.click_until(SEL_A, SEL_B, timeout=0.6, poll=0.1)
+    assert SEL_B in str(exc.value)
+    assert store.clicks.count(SEL_A) >= 2  # 反复点源，而不是点一次死等
+
+
+def test_click_until_keeps_polling_until_when_source_absent(device, store):
+    def appear_later():
+        threading.Event().wait(0.2)
+        store.visible.add(SEL_B)
+
+    threading.Thread(target=appear_later, daemon=True).start()
+    element = device.click_until(SEL_A, SEL_B, timeout=3, poll=0.2)
+    assert element.selector == SEL_B
+    assert store.clicks == []             # 源从未出现 → 不该点击
+
+
+def test_click_until_timeout_reports_until_and_no_source(device, store):
+    with pytest.raises(DeviceError) as exc:
+        device.click_until(SEL_A, SEL_B, timeout=0.3, poll=0.1)
+    message = str(exc.value)
+    assert SEL_B in message
+    assert "从未点到源元素" in message
+
+
+def test_click_until_respects_stop_token(device, store):
+    store.visible.add(SEL_A)
+    device.set_stop_check(lambda: True)
+    with pytest.raises(StopRequested):
+        device.click_until(SEL_A, SEL_B, timeout=3, poll=0.2)
 
 
 # ---------- 动作 ----------
