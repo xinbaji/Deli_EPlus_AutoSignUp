@@ -6,7 +6,22 @@
 > 本文件自 v1.4.0 起建立；更早版本的变更请看
 > [提交历史](https://github.com/xinbaji/Deli_EPlus_AutoSignUp/commits/main)。
 
-## [未发布]
+## [1.4.1] - 2026-09-28
+
+### 修复
+
+- **经纬度校验误报**：`Api.save_location` 里 `except (TypeError, ValueError)` 排在
+  `except ConfigError` 前面，而 `ConfigError` 是 `ValueError` 的子类 —— 于是「超出范围」
+  被前一个分支抢走、报成「经纬度必须是数字」。用户明明输入的是数字（例如 `999`），
+  却收到「必须是数字」，还以为是没存进 `config.json`。已把 `ConfigError` 提到前面。
+- **输入框清空时的误报**：经纬度有 700ms 防抖自动保存，框被清空（重新输入的空档）也会
+  发一次请求，`float("")` 直接报「必须是数字」。现在两端都判空：后端返回
+  `{"ok": true, "skipped": true}`，前端静默跳过、不弹任何错误。
+- `Config.set_location` 不再把「不是数字」包装成 `ConfigError`：GUI/CLI 都在更外层先校验，
+  这一层只做范围检查，避免那句提示误导用户。
+- **GUI「停止」按钮失效**：`_StopToken.stopped` 是返回 bool 的 property，却被直接当回调
+  传给 `SignupFlow(stop_check=...)`；构造时它为 `False`，被 `stop_check or (lambda: False)`
+  兜底吞掉，导致停止令牌永远读不到。改为传 `lambda: self._stop_token.stopped`。
 
 ### 新增
 
@@ -14,11 +29,10 @@
 - 静态检查门：引入 **ruff**（lint）、**black**（格式化）、**mypy**（类型检查），
   已加进 `dev` 依赖，并在 CI 与发版流程里前置执行（不通过则不出包）。
 
-### 修复
+### 测试
 
-- **GUI「停止」按钮失效**：`_StopToken.stopped` 是返回 bool 的 property，却被直接当回调
-  传给 `SignupFlow(stop_check=...)`；构造时它为 `False`，被 `stop_check or (lambda: False)`
-  兜底吞掉，导致停止令牌永远读不到。改为传 `lambda: self._stop_token.stopped`。
+- 离线用例 +15（`click_until` 轮询与停止令牌、失效弹窗监听线程、遮挡弹窗自愈、上滑时长、
+  弹窗优先级、经纬度空值/超范围/非数字），套件合计 101 条，全部通过。
 
 ## [1.4.0] - 2026-09-13
 

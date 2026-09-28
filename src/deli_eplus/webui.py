@@ -132,14 +132,21 @@ class Api:
             return self._err(e)
 
     def save_location(self, lat: str, lon: str) -> dict[str, Any]:
+        lat_s, lon_s = str(lat).strip(), str(lon).strip()
+        if not lat_s or not lon_s:
+            # 前端的输入防抖会在「框被清空 / 还没填」时也发一次请求，此时没有可保存的
+            # 值——返回 skipped 让前端静默跳过，别弹「经纬度必须是数字」误导用户。
+            return {"ok": True, "skipped": True}
         try:
-            self._cfg.set_location(float(lat), float(lon))
+            self._cfg.set_location(float(lat_s), float(lon_s))
             self._cfg.save()
             return {"ok": True}
+        except ConfigError as e:
+            # 必须排在 ValueError 之前：ConfigError 是 ValueError 的子类，
+            # 否则「超出范围」会被前面的分支当成「不是数字」，提示完全误导。
+            return self._err(e)
         except (TypeError, ValueError):
             return self._err(ConfigError("经纬度必须是数字"))
-        except ConfigError as e:
-            return self._err(e)
 
     # ---------- 账号 ----------
 

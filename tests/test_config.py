@@ -79,6 +79,17 @@ def test_set_location_validates_range(config: Config):
     assert config.location == {"latitude": -31.2, "longitude": 121.4}
 
 
+def test_set_location_non_numeric_raises_plain_value_error(config: Config):
+    """config 层不再把「不是数字」包成 ConfigError。
+
+    那句「经纬度必须是数字」在 GUI 里会误导用户以为坐标没写进 config.json；
+    输入校验由调用方（webui.save_location）在自己的提示里负责。
+    """
+    with pytest.raises(ValueError) as exc:
+        config.set_location("abc", 121)  # type: ignore[arg-type]
+    assert not isinstance(exc.value, ConfigError)
+
+
 def test_add_user_validates(config: Config):
     with pytest.raises(ConfigError):
         config.add_user("12345", "pw")

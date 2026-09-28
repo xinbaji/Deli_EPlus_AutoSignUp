@@ -63,6 +63,21 @@ def test_save_emulator_and_location(api):
     assert not bad["ok"]
 
 
+def test_save_location_empty_input_is_skipped_not_error(api):
+    """输入框被清空/未填时防抖也会发请求：应静默跳过，不能弹「必须是数字」。"""
+    for lat, lon in (("", ""), ("31.2", ""), ("", "121.4"), ("   ", "\t")):
+        res = api.save_location(lat, lon)
+        assert res["ok"] and res.get("skipped"), (lat, lon, res)
+
+    brief = api.get_config_brief()  # 没有被写坏：仍是默认值
+    assert brief["latitude"] == 45.0 and brief["longitude"] == 45.0
+
+
+def test_save_location_out_of_range_reports_range(api):
+    res = api.save_location("999", "121.4")
+    assert not res["ok"] and "范围" in res["error"]
+
+
 def test_set_theme_persists(api):
     assert api.set_theme(True)["ok"]
     assert api.get_initial()["theme"] == "dark"

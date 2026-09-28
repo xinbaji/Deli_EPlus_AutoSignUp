@@ -189,10 +189,9 @@ class Config:
             self._data["serial"] = serial.strip() or DEFAULT_CONFIG["serial"]
 
     def set_location(self, latitude: float, longitude: float) -> None:
-        try:
-            lat, lon = float(latitude), float(longitude)
-        except (TypeError, ValueError) as e:
-            raise ConfigError("经纬度必须是数字") from e
+        # 这里不再把「不是数字」包成 ConfigError：调用方（GUI / CLI）都在更外层
+        # 先校验过输入，在这里再抛这个提示只会让用户误以为坐标没写进 config.json。
+        lat, lon = float(latitude), float(longitude)
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
             raise ConfigError("纬度范围 -90~90，经度范围 -180~180")
         with self._lock:

@@ -481,6 +481,7 @@ async function autoSaveLocation() {
   const res = await window.pywebview.api.save_location(lat, lon);
   if (!res.ok) { locLastSig = null; setResult("loc-result", false, res.error); return; }
   locLastSig = sig;
+  if (res.skipped) { setResult("loc-result", null, ""); return; } // 输入框还空着：静默
   setResult("loc-result", true, "已自动保存");
   onHomeShow();
 }
