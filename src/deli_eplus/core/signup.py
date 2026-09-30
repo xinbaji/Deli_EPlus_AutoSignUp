@@ -36,6 +36,17 @@ def _text(text: str) -> str:
     return f"//android.widget.TextView[@text='{text}']"
 
 
+def _any_text(text: str) -> str:
+    """不限定控件类别的文本精确匹配（只用于通用弹窗按钮）。
+
+    弹窗按钮不能锁死 TextView：实测第三方弹窗（模拟器上装的其他 App）用的是
+    android.widget.Button，锁 TextView 时选择器判否 → 弹窗关不掉；而 uiautomator
+    的 dump 只返回最上层窗口，弹窗一挡，底层的目标元素就整层"消失"，
+    只能一路等到超时。放宽为任意控件，得力自己的 TextView 弹窗同样命中。
+    """
+    return f"//*[@text='{text}']"
+
+
 def _contains(fragment: str) -> str:
     """文本模糊匹配（App 改版文案会漂移，如 范围->位置，用 contains 兼容新旧版）。"""
     return f"//android.widget.TextView[contains(@text,'{fragment}')]"
@@ -50,11 +61,11 @@ SKIP_AD = _text("跳过")  # 启动广告页
 MINE_TAB = _text("我的")  # 底部导航
 SETTINGS_ITEM = _text("设置")
 LOGOUT_ITEM = _text("退出登录")
-CONFIRM_BUTTON = _text("确定")  # 各类弹窗的确认
+CONFIRM_BUTTON = _any_text("确定")  # 各类弹窗的确认（不锁控件类别，兼容 Button 弹窗）
 # 会话失效弹窗（首次打开 App 时最多弹一次）：启动后由后台线程盯着，出现即点「确定」
 EXPIRED_HINT = _contains("账号已失效")
 LOGIN_BUTTON = _text("登录")
-AGREE_BUTTON = _text("同意并继续")
+AGREE_BUTTON = _any_text("同意并继续")  # 协议弹窗：得力用 TextView，他方 App 用 Button
 ATTENDANCE_ENTRY = _text("智能考勤")
 # 打卡页状态（得力E+ 3.0 改版后文案为“打卡位置内”，老版本为“打卡范围内”，
 # 用 contains 统一兼容；定位完成前会一直停在“正在获取当前位置”）
@@ -75,6 +86,7 @@ SCROLL_UP = (515, 1662, 515, 457, 0.2)
 MAX_SWIPE_ATTEMPTS = 4
 
 ENTER_LOGIN_TIMEOUT = 120  # 从打开 App 到见到登录按钮的总时限
+ENTER_HOME_TIMEOUT = 45  # 点「同意并继续」后等待「智能考勤」出现的时限（成功即返回）
 PUNCH_TIMEOUT = 90  # 等待"已在打卡范围内"的时限
 EXPIRED_WATCH_INTERVAL = 0.5  # 失效弹窗监听线程的轮询间隔
 
@@ -254,8 +266,16 @@ class SignupFlow:
             float(self._location.get("latitude", 45.0)),
             float(self._location.get("longitude", 45.0)),
         )
-        device.click_until(AGREE_BUTTON, ATTENDANCE_ENTRY, timeout=15)
-        device.click(ATTENDANCE_ENTRY)
+        # 首页渲染慢、或点了「同意并继续」后又冒出权限/公告弹窗（dump 只返回最上层
+        # 窗口，底层控件整体消失）时，「智能考勤」会长时间判定不到：等待期间每轮先清
+        # 遮挡弹窗，命中后直接用已定位到的元素点击——不再二次查找，出现即点。
+        attendance = device.click_until(
+            AGREE_BUTTON,
+            ATTENDANCE_ENTRY,
+            timeout=ENTER_HOME_TIMEOUT,
+            on_round=lambda: self._dismiss_popup(device),
+        )
+        attendance.click()
         self._punch(device)
         self._logout(device)
 

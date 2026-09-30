@@ -265,6 +265,7 @@ class AndroidDevice:
         *,
         timeout: int,
         poll: float = 0.2,
+        on_round: Callable[[], None] | None = None,
     ) -> Element:
         """反复「点 selector → 立刻查 until」，在 timeout 秒内持续进行。
 
@@ -275,6 +276,11 @@ class AndroidDevice:
           只持续轮询 until，直到出现或超时；
         - 全程检查停止令牌，用户点"停止"最多一个轮询周期内生效。
         超时报错携带真实等待时长与期间最后一次底层错误。
+
+        on_round: 每轮开始时的回调。用于清理遮挡弹窗——uiautomator 的
+        dumpWindowHierarchy 只返回最上层窗口，弹窗一出现，底层 Activity 的控件
+        在层级里整体消失，until 明明已在屏幕上却判定"不存在"。回调抛错只记录，
+        不中断轮询。
         """
         deadline = time.monotonic() + timeout
         clicked_once = False
@@ -289,6 +295,15 @@ class AndroidDevice:
                 raise DeviceError(
                     f"点击 {selector} 后 {timeout:g} 秒内未出现 {until_selector}{hint}"
                 ) from last_error
+
+            # 0) 每轮先清遮挡弹窗，否则后续 dump 看不到底层控件
+            if on_round is not None:
+                try:
+                    on_round()
+                except StopRequested:
+                    raise
+                except Exception as e:
+                    last_error = e
 
             # 1) 源还在就点一次——点完紧接着查 until
             try:

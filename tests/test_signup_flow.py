@@ -78,14 +78,19 @@ class ScriptedDevice:
         element.click()
         return element
 
-    def click_until(self, selector, until_selector, *, timeout=15):
+    def click_until(
+        self, selector, until_selector, *, timeout=15, poll=0.2, on_round=None
+    ):
         """与真实实现同语义的剧本版：until 一出现即返回；否则重复补点源。
 
         剧本点击同步换屏，正常一轮或几轮内命中；上限循环防止意外时死循环，
         结束后抛 DeviceError 与真实实现对齐（上层按账号失败处理）。
+        on_round 每轮先跑一次（真实实现借此清遮挡弹窗）。
         """
         last = None
         for _ in range(max(3, timeout)):
+            if on_round is not None:
+                on_round()
             if until_selector in self.screen:
                 return _ScriptedElement(self, until_selector)
             try:
@@ -570,3 +575,65 @@ def test_enter_login_page_clears_blocking_expired_dialog():
 
     assert ("click", CONFIRM_BUTTON) in device.calls
     assert LOGIN_BUTTON in device.screen
+
+
+def _dialog_blocked_home_transitions():
+    """点「同意并继续」后主页被「确定」弹窗遮住；关掉它才露出「智能考勤」。
+
+    登出流程里的「确定」是另一个弹窗（文案相同），用计数区分。
+    """
+    confirms = {"n": 0}
+
+    def on_confirm(device):
+        confirms["n"] += 1
+        if confirms["n"] == 1:
+            goto(ATTENDANCE_ENTRY)(device)  # 关掉遮挡弹窗 → 主页露出
+        else:
+            goto(*LOGIN_PAGE)(device)  # 退出登录的确认
+
+    return {
+        ("click", LOGIN_BUTTON): goto(AGREE_BUTTON),
+        ("click", AGREE_BUTTON): goto(CONFIRM_BUTTON),  # 主页已渲染，但被弹窗盖住
+        ("click", CONFIRM_BUTTON): on_confirm,
+        ("click", ATTENDANCE_ENTRY): goto(IN_RANGE, PUNCH_BUTTON, MINE_TAB),
+        ("click", PUNCH_BUTTON): lambda d: d.screen.add(PUNCH_CONFIRM),
+        ("click", PUNCH_CONFIRM): goto(MINE_TAB),
+        ("click", MINE_TAB): goto(SETTINGS_ITEM),
+        ("swipe",): lambda d: d.screen.add(LOGOUT_ITEM),
+        ("click", LOGOUT_ITEM): goto(CONFIRM_BUTTON),
+    }
+
+
+def test_attendance_wait_clears_blocking_dialog(monkeypatch):
+    """等「智能考勤」时被弹窗遮挡必须自愈：它在屏幕上，但 dump 只返回最上层窗口。
+
+    真机故障形态：点「同意并继续」后冒出弹窗 → 底层主页控件在层级里整体消失 →
+    等到超时才报「点击…后 N 秒内未出现…」。修复后等待期间每轮先清遮挡弹窗。
+    """
+    device, flow, account_events, _ = make_flow(
+        monkeypatch, set(LOGIN_PAGE), _dialog_blocked_home_transitions()
+    )
+
+    assert flow.run() is True
+
+    assert ("click", CONFIRM_BUTTON) in device.calls  # 遮挡弹窗被关掉
+    assert ("click", ATTENDANCE_ENTRY) in device.calls  # 命中后立刻点击
+    assert all(state != "failed" for _, state, _ in account_events)
+
+
+def test_enter_home_timeout_is_a_budget_not_a_fixed_wait():
+    """等待「智能考勤」的预算够宽（成功即返回，慢态不会误判超时）。"""
+    assert signup.ENTER_HOME_TIMEOUT >= 30
+
+
+def test_popup_selectors_do_not_lock_widget_class():
+    """弹窗按钮不能锁死控件类别。
+
+    实机复现：模拟器上另一个 App 的协议弹窗按钮是 android.widget.Button，
+    原来的 //android.widget.TextView[@text='同意并继续'] 直接判否 → 弹窗关不掉；
+    uiautomator 的 dump 只返回最上层窗口，于是底层得力 App 的控件整层"消失"，
+    程序一路等到「120 秒内未能进入登录页」。
+    """
+    for selector in (signup.CONFIRM_BUTTON, signup.AGREE_BUTTON):
+        assert "android.widget." not in selector, f"弹窗按钮锁了控件类别: {selector}"
+        assert "@text=" in selector, selector

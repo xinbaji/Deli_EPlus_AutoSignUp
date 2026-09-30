@@ -35,7 +35,7 @@ from deli_eplus.core.signup import (  # noqa: E402
     SETTINGS_ITEM,
     SignupFlow,
 )
-from deli_eplus.device.base import AndroidDevice  # noqa: E402
+from deli_eplus.device.base import AndroidDevice, Element  # noqa: E402
 from deli_eplus.device.mumu import MuMuDevice  # noqa: E402
 from deli_eplus.log import get as get_logger  # noqa: E402
 
@@ -88,7 +88,46 @@ def _probe_logout_loginpage() -> None:
     SignupFlow._logout = wrapper  # noqa: SLF001
 
 
-def _install_probes() -> None:
+def _probe_element_click() -> None:
+    """Element.click 不经过 AndroidDevice.click（命中即点，省一次查找），单独采。
+
+    流程里 click_until 命中后会用返回的元素直接点击（出现即点），
+    若只挂 AndroidDevice.click，这类点击在计时里会整个丢失。
+    """
+    original = Element.click
+
+    def wrapper(self):
+        _record("click", "start", self.selector)
+        try:
+            return original(self)
+        finally:
+            _record("click", "end", self.selector)
+
+    wrapper.__name__ = "click"
+    Element.click = wrapper
+
+
+def _probe_start_emulator_connect_only() -> None:
+    """--no-start：模拟器已由用户启动时跳过 launch，只做 ADB 连接。
+
+    MuMu 的 control launch 对已在运行的实例仍可能触发一次重启，重启窗口内
+    ADB 端口短时不可用，会把 30 秒连接预算耗光。模拟器已稳定运行时用本模式，
+    只连不管，避免这段无谓的重启等待。
+    """
+
+    def wrapper(self, timeout=240):
+        _record("start_emulator", "start", None)
+        try:
+            self._log.info("已跳过模拟器启动（--no-start），直接连接设备")
+            self.connect(timeout=30)
+        finally:
+            _record("start_emulator", "end", None)
+
+    wrapper.__name__ = "start_emulator"
+    MuMuDevice.start_emulator = wrapper
+
+
+def _install_probes(*, skip_emulator_start: bool = False) -> None:
     for method in (
         "find",
         "exists",
@@ -99,8 +138,12 @@ def _install_probes() -> None:
         "type_text",
     ):
         _probe(AndroidDevice, method, method)
+    _probe_element_click()
     _probe(AndroidDevice, "start_app", "start_app", selector_first=False)
-    _probe(MuMuDevice, "start_emulator", "start_emulator", selector_first=False)
+    if skip_emulator_start:
+        _probe_start_emulator_connect_only()
+    else:
+        _probe(MuMuDevice, "start_emulator", "start_emulator", selector_first=False)
     _probe(MuMuDevice, "set_location", "set_location", selector_first=False)
     _probe_logout_loginpage()
 
@@ -224,6 +267,11 @@ def main() -> int:
         action="store_true",
         help="实际执行打卡（默认 debug，只走到打卡窗口）",
     )
+    parser.add_argument(
+        "--no-start",
+        action="store_true",
+        help="模拟器已在运行：跳过启动，直接连接（避开 launch 触发的重启窗口）",
+    )
     args = parser.parse_args()
 
     config_path = PROJECT_ROOT / "config.json"
@@ -245,7 +293,7 @@ def main() -> int:
         "实际" if args.real_punch else "debug(跳过)",
     )
 
-    _install_probes()
+    _install_probes(skip_emulator_start=args.no_start)
 
     flow = SignupFlow(
         serial=cfg.serial,

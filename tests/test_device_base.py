@@ -210,6 +210,47 @@ def test_click_until_respects_stop_token(device, store):
         device.click_until(SEL_A, SEL_B, timeout=3, poll=0.2)
 
 
+def test_click_until_on_round_runs_every_round(device, store):
+    """每轮都要回调一次：调用方借此清理遮挡弹窗（dump 只返回最上层窗口）。"""
+    calls: list[int] = []
+
+    def appear_later():
+        threading.Event().wait(0.3)
+        store.visible.add(SEL_B)
+
+    threading.Thread(target=appear_later, daemon=True).start()
+    element = device.click_until(
+        SEL_A, SEL_B, timeout=3, poll=0.1, on_round=lambda: calls.append(1)
+    )
+    assert element.selector == SEL_B
+    assert len(calls) >= 2  # 命中前至少轮询了多轮
+
+
+def test_click_until_on_round_error_does_not_abort(device, store):
+    """回调里的瞬断（如 dump 失败）只记录，不打断等待。"""
+
+    def boom():
+        raise RuntimeError("dump 失败")
+
+    def appear_later():
+        threading.Event().wait(0.2)
+        store.visible.add(SEL_B)
+
+    threading.Thread(target=appear_later, daemon=True).start()
+    element = device.click_until(SEL_A, SEL_B, timeout=3, poll=0.1, on_round=boom)
+    assert element.selector == SEL_B
+
+
+def test_click_until_on_round_stop_propagates(device, store):
+    """回调里收到停止请求要立即往外抛，不能被"忽略异常"吞掉。"""
+
+    def stop():
+        raise StopRequested()
+
+    with pytest.raises(StopRequested):
+        device.click_until(SEL_A, SEL_B, timeout=3, poll=0.1, on_round=stop)
+
+
 # ---------- 动作 ----------
 
 
